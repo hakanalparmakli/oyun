@@ -110,23 +110,15 @@ function renderOrder(){
  order.innerHTML="<h2>Oyun Sırası</h2>"+players.map((p,i)=>`${i+1}. ${p.name}`).join("<br>");
 }
 
-// 20 saniye bekle + 3 saniye geri sayma
+// 20 saniye bekle (ekranda gözükmez) + 3 saniye geri sayım
 function waitAndStart(){
  gameActive=true;
- countdown.style.display="flex";
- overlay.style.display="none"; // QR ve setup ekranı kaybolur
+ overlay.style.display="none";
  setup.style.display="none";
- let wait=20;
- countdown.innerText=`Başlıyor: ${wait}`;
- const waitInterval=setInterval(()=>{
-   wait--;
-   if(wait<=0){
-     clearInterval(waitInterval);
-     startCountdown3();
-   }else{
-     countdown.innerText=`Başlıyor: ${wait}`;
-   }
- },1000);
+
+ setTimeout(()=>{
+   startCountdown3();
+ },20000); // 20 saniye arka planda bekle
 }
 
 function startCountdown3(){
