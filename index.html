@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Garantili Noel Baba</title>
+<title>Garantili Noel Baba - Sıralı</title>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -16,15 +16,15 @@ canvas{display:block}
 #setup,#nameScreen,#overlay{
  position:absolute;inset:0;display:flex;
  flex-direction:column;justify-content:center;align-items:center;
- background:#000;z-index:10
+ background:#000;z-index:10;text-align:center
 }
 #countdown{
  position:absolute;inset:0;display:none;
  justify-content:center;align-items:center;
- font-size:120px;font-weight:bold;z-index:20
+ font-size:150px;font-weight:bold;z-index:20
 }
 #qrcode{background:#fff;padding:20px;border-radius:10px;margin-bottom:20px}
-#playerCount{font-size:30px}
+#playerCount,#order{font-size:24px;margin-top:10px}
 
 #mobile{display:none;position:fixed;inset:0;background:#000}
 .pad{
@@ -40,7 +40,7 @@ canvas{display:block}
  margin:auto
 }
 .jump{background:rgba(255,0,0,.3);font-size:70px}
-input,button{font-size:30px;padding:15px;margin:10px}
+input,button{font-size:25px;padding:10px;margin:10px}
 </style>
 </head>
 
@@ -75,20 +75,15 @@ input,button{font-size:30px;padding:15px;margin:10px}
 <script>
 document.addEventListener("contextmenu",e=>e.preventDefault());
 
-const canvas=c, ctx=canvas.getContext("2d");
+const canvas=c,ctx=canvas.getContext("2d");
 canvas.width=innerWidth; canvas.height=innerHeight;
 
 const peer=new Peer();
 const params=new URLSearchParams(location.search);
 const peerId=params.get("peer");
 
-let players=[];
-let currentIndex=0;
-let activePeer=null;
-let keys={left:false,right:false,up:false};
-let gameActive=false;
-
-let santa,platforms=[],finishX=3500;
+let players=[],currentIndex=0,activePeer=null,keys={left:false,right:false,up:false};
+let gameActive=false,santa,platforms=[],finishX=3500;
 
 /* ================= HOST ================= */
 if(!peerId){
@@ -103,10 +98,7 @@ peer.on("connection",c=>{
    players.push({peer:c.peer,name:d.name,score:0});
    playerCount.innerText=`Oyuncular: ${players.length} / 10`;
    renderOrder();
-   if(players.length>=1 && players.length<=10 && !gameActive){
-    setTimeout(startTurn,3000);
-    gameActive=true;
-   }
+   if(!gameActive) waitAndStart();
   }
   if(d.type==="key" && c.peer===activePeer){
    keys[d.key]=d.pressed;
@@ -118,25 +110,55 @@ function renderOrder(){
  order.innerHTML="<h2>Oyun Sırası</h2>"+players.map((p,i)=>`${i+1}. ${p.name}`).join("<br>");
 }
 
+// 10 saniye bekle + 3 saniye geri sayma
+function waitAndStart(){
+ gameActive=true;
+ countdown.style.display="flex";
+ let wait=10;
+ countdown.innerText=`Başlıyor: ${wait}`;
+ const waitInterval=setInterval(()=>{
+   wait--;
+   if(wait<=0){
+     clearInterval(waitInterval);
+     startCountdown3();
+   }else{
+     countdown.innerText=`Başlıyor: ${wait}`;
+   }
+ },1000);
+}
+
+function startCountdown3(){
+ let count=3;
+ countdown.innerText=count;
+ const i=setInterval(()=>{
+   count--;
+   if(count>0) countdown.innerText=count;
+   else{
+     clearInterval(i);
+     countdown.style.display="none";
+     overlay.style.display="none";
+     startTurn();
+   }
+ },1000);
+}
+
 function startTurn(){
  if(currentIndex>=players.length){
-  overlay.innerHTML="<h1>Oyun Bitti</h1>"+players
+  overlay.innerHTML="<h1>Oyun Bitti!</h1>"+players
    .sort((a,b)=>b.score-a.score)
    .map((p,i)=>`${i+1}. ${p.name} - ${p.score}`).join("<br>");
   overlay.style.display="flex";
   return;
  }
-
  const p=players[currentIndex];
  activePeer=p.peer;
-
  overlay.innerHTML=`<h1>Şimdi Oynuyor</h1><h2>${p.name}</h2>`;
  overlay.style.display="flex";
 
  setTimeout(()=>{
   overlay.style.display="none";
   initGame();
- },2000);
+ },1500);
 }
 
 /* ================= GAME ================= */
@@ -157,11 +179,11 @@ function initGame(){
 function loop(){
  ctx.fillStyle="#000"; ctx.fillRect(0,0,canvas.width,canvas.height);
 
- if(keys.left)santa.vx=-10;
- else if(keys.right)santa.vx=10;
+ if(keys.left)santa.vx=-8;
+ else if(keys.right)santa.vx=8;
  else santa.vx*=0.8;
 
- if(keys.up && santa.ground){santa.vy=-20; santa.ground=false;}
+ if(keys.up && santa.ground){santa.vy=-15; santa.ground=false;}
 
  santa.vy+=0.6;
  santa.x+=santa.vx; santa.y+=santa.vy; santa.ground=false;
@@ -180,9 +202,7 @@ function loop(){
 
  ctx.save();
  ctx.translate(-santa.x+150,0);
- platforms.forEach(p=>{
-  ctx.fillStyle="#0ff"; ctx.fillRect(p.x,p.y,p.w,p.h);
- });
+ platforms.forEach(p=>{ ctx.fillStyle="#0ff"; ctx.fillRect(p.x,p.y,p.w,p.h); });
  ctx.font="120px Arial";
  ctx.fillText("🎅",santa.x,santa.y+100);
  ctx.restore();
@@ -200,28 +220,28 @@ function loop(){
 
 /* ================= MOBILE ================= */
 }else{
-
 setup.style.display="none";
 nameScreen.style.display="flex";
 
 peer.on("open",()=>{
  const conn=peer.connect(peerId);
 
- joinBtn.onclick=()=>{
-  conn.send({type:"join",name:playerName.value});
+ const sendJoin=()=>{
+  const name=playerName.value.trim();
+  if(!name) return alert("Lütfen isim girin");
+  conn.send({type:"join",name});
   nameScreen.style.display="none";
   mobile.style.display="block";
  };
 
+ joinBtn.addEventListener("click",sendJoin);
+ joinBtn.addEventListener("touchstart",e=>{ e.preventDefault(); sendJoin(); },{passive:false});
+
  ["left","right","up"].forEach((k,i)=>{
   const id=i==0?"left":i==1?"right":"jump";
   const el=document.getElementById(id);
-  el.addEventListener("touchstart",e=>{
-   e.preventDefault(); conn.send({type:"key",key:k,pressed:true});
-  },{passive:false});
-  el.addEventListener("touchend",e=>{
-   e.preventDefault(); conn.send({type:"key",key:k,pressed:false});
-  },{passive:false});
+  el.addEventListener("touchstart",e=>{e.preventDefault();conn.send({type:"key",key:k,pressed:true});},{passive:false});
+  el.addEventListener("touchend",e=>{e.preventDefault();conn.send({type:"key",key:k,pressed:false});},{passive:false});
  });
 });
 }
