@@ -1,212 +1,269 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Garantili Noel Baba</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <style>
-        body { margin: 0; background: #000; color: #fff; overflow: hidden; font-family: sans-serif; }
-        canvas { display: block; }
-        #setup-screen {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: #000; z-index: 10;
-        }
-        #qrcode { padding: 15px; background: white; border-radius: 10px; }
-        
-        #mobile-controller {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; touch-action: none;
-        }
-        .pad { display: flex; height: 100%; width: 100%; }
-        .btn-side { flex: 1; display: flex; flex-direction: column; }
-        .btn-jump {
-            flex: 2; border: 5px solid #fff; background: rgba(255, 0, 0, 0.3);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 70px; font-weight: bold; margin: 10px; border-radius: 40px;
-        }
-        .direction {
-            flex: 1; border: 3px solid #fff; display: flex; align-items: center; justify-content: center;
-            font-size: 70px; margin: 10px; border-radius: 40px; background: rgba(255, 255, 255, 0.1);
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Garantili Noel Baba</title>
+
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<style>
+body { margin:0; background:#000; color:#fff; font-family:Arial; overflow:hidden }
+canvas { display:block }
+
+#setup, #nameScreen, #endScreen {
+ position:absolute; inset:0; display:flex;
+ flex-direction:column; justify-content:center; align-items:center;
+ background:#000; z-index:10;
+}
+
+#qrcode { background:#fff; padding:20px; border-radius:10px }
+
+#mobile { display:none; position:fixed; inset:0; background:#000 }
+.pad { display:flex; height:100% }
+.side { flex:1; display:flex; justify-content:center; align-items:center }
+.btn { font-size:60px; border:4px solid #fff; border-radius:30px;
+ margin:10px; width:90%; height:40%; display:flex;
+ justify-content:center; align-items:center }
+.jump { flex:2; background:rgba(255,0,0,.3) }
+input, button {
+ font-size:30px; padding:15px; margin:10px;
+}
+</style>
 </head>
+
 <body>
 
-    <div id="setup-screen">
-        <div id="qrcode"></div>
-        <h2 id="status">BAĞLAN VE BAŞLA</h2>
-    </div>
-    
-    <canvas id="gameCanvas"></canvas>
+<div id="setup">
+ <div id="qrcode"></div>
+ <h1 id="status">BAĞLAN</h1>
+</div>
 
-    <div id="mobile-controller">
-        <div class="pad">
-            <div class="btn-side"><div id="btn-left" class="direction">◀</div></div>
-            <div id="btn-up" class="btn-jump">ZIPLA</div>
-            <div class="btn-side"><div id="btn-right" class="direction">▶</div></div>
-        </div>
-    </div>
+<div id="nameScreen" style="display:none">
+ <h1>İsmini Gir</h1>
+ <input id="playerName" placeholder="Adın">
+ <button id="joinBtn">KATIL</button>
+</div>
+
+<div id="mobile">
+ <div class="pad">
+  <div class="side"><div id="left" class="btn">◀</div></div>
+  <div id="jump" class="btn jump">ZIPLA</div>
+  <div class="side"><div id="right" class="btn">▶</div></div>
+ </div>
+</div>
+
+<div id="endScreen" style="display:none"></div>
+
+<canvas id="c"></canvas>
 
 <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const statusText = document.getElementById('status');
-    const peer = new Peer();
-    let conn;
-    let keys = { left: false, right: false, up: false };
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const peerIdParam = urlParams.get('peer');
+const peer = new Peer();
+const url = new URLSearchParams(location.search);
+const peerId = url.get("peer");
 
-    if (!peerIdParam) {
-        peer.on('open', (id) => {
-            new QRCode(document.getElementById("qrcode"), {
-                text: window.location.href + "?peer=" + id,
-                width: 250, height: 250
-            });
-        });
-        peer.on('connection', (c) => {
-            conn = c;
-            statusText.innerText = "HAZIR!";
-            setTimeout(() => {
-                document.getElementById('setup-screen').style.display = 'none';
-                initGame();
-            }, 1000);
-            conn.on('data', (data) => { keys[data.key] = data.pressed; });
-        });
-    } else {
-        document.getElementById('setup-screen').style.display = 'none';
-        document.getElementById('mobile-controller').style.display = 'block';
-        peer.on('open', () => {
-            conn = peer.connect(peerIdParam);
-            const bindBtn = (id, keyName) => {
-                const el = document.getElementById(id);
-                el.addEventListener('touchstart', (e) => { e.preventDefault(); if(conn) conn.send({key: keyName, pressed: true}); });
-                el.addEventListener('touchend', (e) => { e.preventDefault(); if(conn) conn.send({key: keyName, pressed: false}); });
-            };
-            bindBtn('btn-left', 'left'); bindBtn('btn-right', 'right'); bindBtn('btn-up', 'up');
-        });
+const MAX = 10;
+let players = {};
+let gameStarted = false;
+let waitStarted = false;
+let countdown = 3;
+
+let keys = { left:false, right:false, up:false };
+
+let santa, platforms, gifts;
+let finishedPlayers = 0;
+
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+
+/* ================= HOST ================= */
+if (!peerId) {
+
+peer.on("open", id => {
+ new QRCode(qrcode, {
+  text: location.href + "?peer=" + id,
+  width:250, height:250
+ });
+});
+
+peer.on("connection", c => {
+ c.on("data", data => {
+
+  if (data.type === "join") {
+   if (Object.keys(players).length >= MAX) return;
+
+   players[c.peer] = {
+    name:data.name, score:0, finished:false
+   };
+
+   status.innerText =
+    `Oyuncular: ${Object.keys(players).length}/${MAX}`;
+
+   if (Object.keys(players).length === MAX) startGame();
+   else if (!waitStarted) waitForStart();
+  }
+
+  if (data.type === "key") {
+   keys[data.key] = data.pressed;
+  }
+ });
+});
+
+function waitForStart() {
+ waitStarted = true;
+ setTimeout(() => {
+  const i = setInterval(() => {
+   status.innerText = countdown;
+   countdown--;
+   if (countdown < 0) {
+    clearInterval(i);
+    startGame();
+   }
+  },1000);
+ },10000);
+}
+
+function startGame() {
+ gameStarted = true;
+ setup.style.display = "none";
+ initGame();
+}
+
+/* ================= GAME ================= */
+function initGame() {
+ santa = { x:100,y:200,w:80,h:90,vx:0,vy:0,ground:false };
+ platforms = [{x:0,y:canvas.height-120,w:2000,h:30}];
+ gifts = [];
+ for(let i=0;i<20;i++) spawn();
+ requestAnimationFrame(loop);
+}
+
+function spawn() {
+ let last = platforms[platforms.length-1];
+ let x = last.x + last.w + 30;
+ let y = Math.max(200, last.y + (Math.random()-0.5)*100);
+ let w = 400;
+ platforms.push({x,y,w,h:30});
+ gifts.push({x:x+w/2,y:y-80,active:true});
+}
+
+function loop() {
+ if (!gameStarted) return;
+
+ if (keys.left) santa.vx=-12;
+ else if (keys.right) santa.vx=12;
+ else santa.vx*=0.8;
+
+ if (keys.up && santa.ground) {
+  santa.vy=-28; santa.ground=false;
+ }
+
+ santa.vy+=0.6;
+ santa.x+=santa.vx;
+ santa.y+=santa.vy;
+ santa.ground=false;
+
+ platforms.forEach(p=>{
+  if (santa.vy>=0 &&
+   santa.x<p.x+p.w &&
+   santa.x+santa.w>p.x &&
+   santa.y+santa.h>p.y &&
+   santa.y+santa.h<p.y+p.h+20) {
+    santa.ground=true;
+    santa.vy=0;
+    santa.y=p.y-santa.h;
+  }
+ });
+
+ gifts.forEach(g=>{
+  if (g.active &&
+   Math.abs(santa.x-g.x)<60 &&
+   Math.abs(santa.y-g.y)<80) {
+    g.active=false;
+    let p = Object.values(players).find(x=>!x.finished);
+    if (p) {
+     p.score++;
+     if (p.score>=5) {
+      p.finished=true;
+      finishedPlayers++;
+     }
     }
+  }
+ });
 
-    let santa, platforms, gifts, score;
+ if (finishedPlayers === Object.keys(players).length) endGame();
 
-    function initGame() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        score = 0;
-        santa = { 
-            x: 100, y: canvas.height - 400, 
-            w: 80, h: 90, 
-            vx: 0, vy: 0, 
-            jumpForce: -28, // Süper zıplama
-            grounded: false 
-        };
-        // Başlangıç zemini çok geniş
-        platforms = [{ x: 50, y: canvas.height - 150, w: 1000, h: 30 }];
-        gifts = [];
-        for(let i=0; i<20; i++) spawnPlatform();
-        requestAnimationFrame(update);
-    }
+ draw();
+ requestAnimationFrame(loop);
+}
 
-    function spawnPlatform() {
-        const last = platforms[platforms.length - 1];
-        
-        // --- MESAFELERİ SIFIRLADIK ---
-        // Platformlar neredeyse bitişik (0-40 piksel boşluk)
-        const xGap = 10 + Math.random() * 30; 
-        // Yükseklik farkı Noel Baba'nın tek zıplamasına çok uygun
-        const yGap = (Math.random() - 0.5) * 100; 
-        
-        const x = last.x + last.w + xGap;
-        let y = Math.max(250, Math.min(canvas.height - 180, last.y + yGap));
-        const w = 400 + Math.random() * 200; // Dev gibi platformlar
+function draw() {
+ ctx.fillStyle="#000";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
 
-        platforms.push({ x, y, w, h: 30 });
-        if(Math.random() > 0.4) gifts.push({ x: x + w/2, y: y - 80, active: true });
-    }
+ ctx.save();
+ ctx.translate(-santa.x+150,0);
 
-    function update() {
-        // Havada kontrolü daha keskin yaptık
-        let speed = 14;
-        if (keys.left) santa.vx = -speed;
-        else if (keys.right) santa.vx = speed;
-        else santa.vx *= 0.85;
+ platforms.forEach(p=>{
+  ctx.fillStyle="#0ff";
+  ctx.fillRect(p.x,p.y,p.w,p.h);
+ });
 
-        if (keys.up && santa.grounded) {
-            santa.vy = santa.jumpForce;
-            santa.grounded = false;
-        }
+ ctx.font="60px Arial";
+ gifts.forEach(g=>{ if(g.active) ctx.fillText("🎁",g.x,g.y); });
 
-        // Düşük yerçekimi = daha uzun uçuş süresi
-        santa.vy += 0.6; 
-        santa.x += santa.vx;
-        santa.y += santa.vy;
-        
-        santa.grounded = false;
+ ctx.font="120px Arial";
+ ctx.fillText("🎅",santa.x,santa.y+100);
 
-        platforms.forEach(p => {
-            if (santa.vy >= 0 && 
-                santa.x + 10 < p.x + p.w && 
-                santa.x + santa.w - 10 > p.x && 
-                santa.y + santa.h > p.y && 
-                santa.y + santa.h < p.y + p.h + santa.vy + 10) {
-                
-                santa.grounded = true;
-                santa.vy = 0;
-                santa.y = p.y - santa.h;
-            }
-        });
+ ctx.restore();
+}
 
-        gifts.forEach(g => {
-            if (g.active && Math.abs(santa.x - g.x) < 80 && Math.abs(santa.y - g.y) < 120) {
-                g.active = false;
-                score++;
-                if (platforms.length < score + 25) spawnPlatform();
-            }
-        });
+/* ================= END ================= */
+function endGame() {
+ gameStarted=false;
+ endScreen.style.display="flex";
 
-        if (santa.y > canvas.height + 200) {
-            // Ölünce en yakın platformun hemen üstüne ışınla (haksızlık olmasın)
-            const restart = platforms.find(p => p.x > santa.x - 300) || platforms[0];
-            santa.x = restart.x + 20;
-            santa.y = restart.y - 300;
-            santa.vy = 0;
-        }
+ const ranking = Object.values(players)
+  .sort((a,b)=>b.score-a.score);
 
-        draw();
-        requestAnimationFrame(update);
-    }
+ endScreen.innerHTML =
+  "<h1>🏆 PUAN TABLOSU</h1>" +
+  ranking.map((p,i)=>
+   `<h2>${i+1}. ${p.name} - ${p.score}</h2>`
+  ).join("");
+}
 
-    function draw() {
-        ctx.fillStyle = "#000"; // Projeksiyon için tam siyah
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+/* ================= MOBILE ================= */
+} else {
 
-        const camX = -santa.x + 150;
-        ctx.save();
-        ctx.translate(camX, 0);
+setup.style.display="none";
+nameScreen.style.display="flex";
 
-        platforms.forEach(p => {
-            ctx.fillStyle = "#0ff"; // Parlak Turkuaz
-            ctx.fillRect(p.x, p.y, p.w, p.h);
-            ctx.fillStyle = "#fff";
-            ctx.fillRect(p.x, p.y, p.w, 10); // Kar katmanı
-        });
+peer.on("open",()=>{
+ const conn = peer.connect(peerId);
 
-        ctx.font = "70px Arial";
-        gifts.forEach(g => { if(g.active) ctx.fillText("🎁", g.x, g.y); });
-        
-        ctx.font = "120px Arial"; 
-        ctx.fillText("🎅", santa.x, santa.y + 100);
-        
-        ctx.restore();
+ joinBtn.onclick = ()=>{
+  conn.send({type:"join",name:playerName.value});
+  nameScreen.style.display="none";
+  mobile.style.display="block";
+ };
 
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 40px Arial";
-        ctx.fillText("SKOR: " + score, 40, 80);
-    }
+ const bind=(id,key)=>{
+  const e=document.getElementById(id);
+  e.ontouchstart=()=>conn.send({type:"key",key,pressed:true});
+  e.ontouchend=()=>conn.send({type:"key",key,pressed:false});
+ };
+
+ bind("left","left");
+ bind("right","right");
+ bind("jump","up");
+});
+}
 </script>
+
 </body>
 </html>
