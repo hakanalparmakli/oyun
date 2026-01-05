@@ -7,7 +7,6 @@
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        /* ... (tüm style aynı kalıyor, kısaltıyorum) ... */
         body { margin: 0; background: #000; color: #fff; overflow: hidden; font-family: 'Arial Rounded MT Bold', sans-serif; }
         canvas { display: block; }
         #setup-screen {
@@ -21,14 +20,19 @@
         #status { font-size: 2.5em; margin-top: 20px; text-shadow: 0 0 15px #0ff; }
         #player-list { font-size: 1.5em; margin: 20px; text-align: center; }
         #countdown { font-size: 5em; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20; display: none; }
-
-        /* Mobil Kumanda ve diğer style'lar aynı... */
-        /* (önceki kodundan kopyala, değişmedi) */
     </style>
 </head>
 <body>
 
-    <!-- HTML kısmı aynı -->
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="setup-screen">
+        <div id="qrcode"></div>
+        <div id="status">Bağlantı kuruluyor...</div>
+        <div id="player-list"></div>
+    </div>
+
+    <div id="countdown"></div>
 
 <script>
     const canvas = document.getElementById('gameCanvas');
@@ -37,12 +41,12 @@
     const playerList = document.getElementById('player-list');
     const countdownEl = document.getElementById('countdown');
 
-    // *** BURAYI DEĞİŞTİR: Railway'den aldığın domain'i yaz (https:// olmadan) ***
+    // *** SERVERLESS ÇALIŞMASI İÇİN DEĞİŞTİRİLEN KISIM ***
     const peer = new Peer(undefined, {
-        host: 'peerjs-server.up.railway.app',  // <-- Örnek: senin-url.up.railway.app
+        host: '0.peerjs.com',
         secure: true,
-        port: 443,
-        path: '/peerjs'  // Railway'de default bu, gerekirse log'lardan kontrol et
+        port: 443
+        // Path belirtmeye gerek yok, resmi server otomatik doğru yolu kullanıyor
     });
 
     let connections = [];
@@ -56,10 +60,10 @@
     const urlParams = new URLSearchParams(window.location.search);
     const peerIdParam = urlParams.get('peer');
 
-    // Hata takibi (konsolda göreceksin)
+    // Hata takibi
     peer.on('error', (err) => {
         console.error('PeerJS Hatası:', err);
-        statusText.innerText = "Bağlantı Hatası: " + err.type + " – Server URL'yi kontrol et!";
+        statusText.innerText = "Bağlantı Hatası: " + err.type;
     });
 
     peer.on('disconnected', () => {
@@ -76,17 +80,89 @@
                 width: 280, height: 280, colorDark: "#0ff", colorLight: "#fff"
             });
             statusText.innerText = "Oyuncular Bekleniyor (0/" + maxPlayers + ")";
+            updatePlayerList();
         });
 
         peer.on('connection', (conn) => {
-            // ... (geri kalan host kodu tamamen aynı)
+            if (connections.length >= maxPlayers) {
+                conn.on('open', () => {
+                    conn.send({ type: 'full' });
+                    conn.close();
+                });
+                return;
+            }
+
+            connections.push(conn);
+            const playerId = connections.length;
+
+            conn.on('open', () => {
+                console.log('Yeni oyuncu bağlandı:', playerId);
+                conn.send({ type: 'id', id: playerId });
+                updatePlayerList();
+            });
+
+            conn.on('data', (data) => {
+                if (data.type === 'input') {
+                    if (players[playerId]) {
+                        players[playerId].left = data.left;
+                        players[playerId].right = data.right;
+                        players[playerId].jump = data.jump;
+                    }
+                }
+            });
+
+            conn.on('close', () => {
+                console.log('Oyuncu ayrıldı:', playerId);
+                connections.splice(connections.indexOf(conn), 1);
+                delete players[playerId];
+                updatePlayerList();
+            });
         });
+
     } else {
-        // Client tarafı – aynı kalıyor
+        // Client (mobil) tarafı
+        peer.on('open', () => {
+            const conn = peer.connect(peerIdParam);
+            
+            conn.on('open', () => {
+                statusText.innerText = "Bağlandı! Kontroller aktif.";
+                document.getElementById('setup-screen').style.display = 'none';
+                // Burada mobil kontrolleri gösterebilirsin
+            });
+
+            conn.on('data', (data) => {
+                if (data.type === 'id') {
+                    // ID alındı, oyun başlayabilir
+                } else if (data.type === 'full') {
+                    statusText.innerText = "Oyun dolu!";
+                }
+            });
+
+            // Mobil kontrollerden gelen input'ları gönder
+            // (Senin önceki kodunda varsa buraya ekle)
+        });
     }
 
-    // *** Geri kalan tüm script aynı (initGame, update, draw vs.) ***
-    // (Önceki verdiğim uzun kodun tamamını buraya yapıştır, sadece üst kısmı değiştirdik)
+    function updatePlayerList() {
+        const count = connections.length + 1; // +1 host için
+        statusText.innerText = `Oyuncular Bekleniyor (\( {count}/ \){maxPlayers})`;
+        playerList.innerText = `Bağlananlar: ${count} kişi`;
+        
+        if (count >= 2 && !gameStarted) {
+            // Otomatik başlatma vs. ekleyebilirsin
+        }
+    }
+
+    // Geri kalan oyun mantığın (initGame, update, draw vs.) buraya gelecek
+    // (Önceki tam kodunda ne varsa aynı şekilde devam et)
+
+    // Canvas boyutlandırma
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
 
 </script>
 </body>
