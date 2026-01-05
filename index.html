@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Garantili Noel Baba - Puanlı</title>
+<title>Garantili Noel Baba - Uzun Zorlu Oyun</title>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -83,7 +83,7 @@ const params=new URLSearchParams(location.search);
 const peerId=params.get("peer");
 
 let players=[],currentIndex=0,activePeer=null,keys={left:false,right:false,up:false};
-let gameActive=false,santa,platforms=[],finishX=6000,lastCheckpoint={x:50,y:200},startTime=0,falls=0;
+let gameActive=false,santa,platforms=[],finishX=10000,lastCheckpoint={x:50,y:200},startTime=0,falls=0;
 
 /* ================= HOST ================= */
 if(!peerId){
@@ -135,7 +135,6 @@ function startCountdown3(){
 
 function startTurn(){
  if(currentIndex>=players.length){
-  // tüm oyuncular bitince skor tablosu
   let sorted=players.slice().sort((a,b)=>{
    if(a.time!==b.time) return a.time-b.time;
    return a.falls-b.falls;
@@ -165,10 +164,10 @@ platforms=[{x:0,y:canvas.height-120,w:600,h:30,checkpoint:true}];
 
 let x=600,platIndex=1;
 while(x<finishX){
- let gap=220+Math.random()*120;
- let w=260;
- let y=canvas.height-200+(Math.random()-0.5)*120;
- let checkpoint=(platIndex%5===0);
+ let gap=220+Math.random()*150; // zorluk için boşluk
+ let w=200+Math.random()*100;
+ let y=canvas.height-200+(Math.random()-0.5)*150; // yükseklik farkları
+ let checkpoint=(platIndex%10===0); // her 10 platform checkpoint
  platforms.push({x,y,w,h:30,checkpoint});
  x+=w+gap;
  platIndex++;
@@ -202,7 +201,6 @@ function loop(){
   }
  });
 
- // Düşme kontrolü
  if(santa.y>canvas.height){
    santa.x=lastCheckpoint.x;
    santa.y=lastCheckpoint.y;
@@ -227,7 +225,6 @@ function loop(){
  ctx.fillText("🎅",santa.x,santa.y+100);
  ctx.restore();
 
- // bitiş
  if(santa.x+80>finishX){
   const timeElapsed=(Date.now()-startTime)/1000;
   players[currentIndex].time=timeElapsed;
