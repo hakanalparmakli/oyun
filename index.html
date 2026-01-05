@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Süper Noel Baba - Projeksiyon</title>
+    <title>Garantili Noel Baba</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
@@ -16,54 +16,37 @@
         }
         #qrcode { padding: 15px; background: white; border-radius: 10px; }
         
-        /* TELEFON KUMANDASI İÇİN DEVASA BUTONLAR */
         #mobile-controller {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; touch-action: none;
         }
-        .pad { 
-            display: flex; 
-            height: 100%; 
-            width: 100%;
-        }
-        .btn-side {
-            flex: 1; /* Sol ve Sağ için ekranın %25'i */
-            display: flex; flex-direction: column;
-        }
+        .pad { display: flex; height: 100%; width: 100%; }
+        .btn-side { flex: 1; display: flex; flex-direction: column; }
         .btn-jump {
-            flex: 2; /* Zıplama için ekranın %50'si */
-            border: 4px solid #fff;
-            background: rgba(255, 0, 0, 0.2);
+            flex: 2; border: 5px solid #fff; background: rgba(255, 0, 0, 0.3);
             display: flex; align-items: center; justify-content: center;
-            font-size: 80px; font-weight: bold; margin: 10px; border-radius: 30px;
+            font-size: 70px; font-weight: bold; margin: 10px; border-radius: 40px;
         }
         .direction {
-            flex: 1; border: 4px solid #fff;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 80px; margin: 10px; border-radius: 30px;
-            background: rgba(255, 255, 255, 0.1);
+            flex: 1; border: 3px solid #fff; display: flex; align-items: center; justify-content: center;
+            font-size: 70px; margin: 10px; border-radius: 40px; background: rgba(255, 255, 255, 0.1);
         }
-        .btn:active { background: #ff0000 !important; color: white; }
     </style>
 </head>
 <body>
 
     <div id="setup-screen">
         <div id="qrcode"></div>
-        <h2 id="status">BAĞLAN VE ZIPLA!</h2>
+        <h2 id="status">BAĞLAN VE BAŞLA</h2>
     </div>
     
     <canvas id="gameCanvas"></canvas>
 
     <div id="mobile-controller">
         <div class="pad">
-            <div class="btn-side">
-                <div id="btn-left" class="direction btn">◀</div>
-            </div>
-            <div id="btn-up" class="btn-jump btn">ZIPLA</div>
-            <div class="btn-side">
-                <div id="btn-right" class="direction btn">▶</div>
-            </div>
+            <div class="btn-side"><div id="btn-left" class="direction">◀</div></div>
+            <div id="btn-up" class="btn-jump">ZIPLA</div>
+            <div class="btn-side"><div id="btn-right" class="direction">▶</div></div>
         </div>
     </div>
 
@@ -87,7 +70,7 @@
         });
         peer.on('connection', (c) => {
             conn = c;
-            statusText.innerText = "BAŞLIYOR...";
+            statusText.innerText = "HAZIR!";
             setTimeout(() => {
                 document.getElementById('setup-screen').style.display = 'none';
                 initGame();
@@ -115,45 +98,50 @@
         canvas.height = window.innerHeight;
         score = 0;
         santa = { 
-            x: 100, y: canvas.height - 300, 
-            w: 90, h: 100, 
+            x: 100, y: canvas.height - 400, 
+            w: 80, h: 90, 
             vx: 0, vy: 0, 
-            jumpForce: -26, // Zıplama gücü daha da artırıldı
+            jumpForce: -28, // Süper zıplama
             grounded: false 
         };
-        platforms = [{ x: 50, y: canvas.height - 150, w: 800, h: 30 }];
+        // Başlangıç zemini çok geniş
+        platforms = [{ x: 50, y: canvas.height - 150, w: 1000, h: 30 }];
         gifts = [];
-        for(let i=0; i<15; i++) spawnPlatform();
+        for(let i=0; i<20; i++) spawnPlatform();
         requestAnimationFrame(update);
     }
 
     function spawnPlatform() {
         const last = platforms[platforms.length - 1];
-        // Platformlar çok daha yakın ve güvenli
-        const xGap = 40 + Math.random() * 60; 
-        const yGap = (Math.random() - 0.5) * 120; 
+        
+        // --- MESAFELERİ SIFIRLADIK ---
+        // Platformlar neredeyse bitişik (0-40 piksel boşluk)
+        const xGap = 10 + Math.random() * 30; 
+        // Yükseklik farkı Noel Baba'nın tek zıplamasına çok uygun
+        const yGap = (Math.random() - 0.5) * 100; 
         
         const x = last.x + last.w + xGap;
-        let y = Math.max(300, Math.min(canvas.height - 200, last.y + yGap));
-        const w = 300 + Math.random() * 100;
+        let y = Math.max(250, Math.min(canvas.height - 180, last.y + yGap));
+        const w = 400 + Math.random() * 200; // Dev gibi platformlar
 
         platforms.push({ x, y, w, h: 30 });
-        if(Math.random() > 0.3) gifts.push({ x: x + w/2 - 20, y: y - 80, active: true });
+        if(Math.random() > 0.4) gifts.push({ x: x + w/2, y: y - 80, active: true });
     }
 
     function update() {
-        // Hareket ve Havada Süzülme
-        if (keys.left) santa.vx = -12;
-        else if (keys.right) santa.vx = 12;
-        else santa.vx *= 0.9;
+        // Havada kontrolü daha keskin yaptık
+        let speed = 14;
+        if (keys.left) santa.vx = -speed;
+        else if (keys.right) santa.vx = speed;
+        else santa.vx *= 0.85;
 
         if (keys.up && santa.grounded) {
             santa.vy = santa.jumpForce;
             santa.grounded = false;
         }
 
-        // Yerçekimi azaltıldı (0.7), daha yumuşak düşüş
-        santa.vy += 0.7; 
+        // Düşük yerçekimi = daha uzun uçuş süresi
+        santa.vy += 0.6; 
         santa.x += santa.vx;
         santa.y += santa.vy;
         
@@ -161,8 +149,8 @@
 
         platforms.forEach(p => {
             if (santa.vy >= 0 && 
-                santa.x + 20 < p.x + p.w && 
-                santa.x + santa.w - 20 > p.x && 
+                santa.x + 10 < p.x + p.w && 
+                santa.x + santa.w - 10 > p.x && 
                 santa.y + santa.h > p.y && 
                 santa.y + santa.h < p.y + p.h + santa.vy + 10) {
                 
@@ -176,14 +164,15 @@
             if (g.active && Math.abs(santa.x - g.x) < 80 && Math.abs(santa.y - g.y) < 120) {
                 g.active = false;
                 score++;
-                if (platforms.length < score + 20) spawnPlatform();
+                if (platforms.length < score + 25) spawnPlatform();
             }
         });
 
         if (santa.y > canvas.height + 200) {
-            const restart = platforms.find(p => p.x > santa.x - 500) || platforms[0];
-            santa.x = restart.x + 50;
-            santa.y = restart.y - 400;
+            // Ölünce en yakın platformun hemen üstüne ışınla (haksızlık olmasın)
+            const restart = platforms.find(p => p.x > santa.x - 300) || platforms[0];
+            santa.x = restart.x + 20;
+            santa.y = restart.y - 300;
             santa.vy = 0;
         }
 
@@ -192,18 +181,18 @@
     }
 
     function draw() {
-        ctx.fillStyle = "#000";
+        ctx.fillStyle = "#000"; // Projeksiyon için tam siyah
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        const camX = -santa.x + 200;
+        const camX = -santa.x + 150;
         ctx.save();
         ctx.translate(camX, 0);
 
         platforms.forEach(p => {
-            ctx.fillStyle = "#0ff"; 
+            ctx.fillStyle = "#0ff"; // Parlak Turkuaz
             ctx.fillRect(p.x, p.y, p.w, p.h);
             ctx.fillStyle = "#fff";
-            ctx.fillRect(p.x, p.y, p.w, 8); 
+            ctx.fillRect(p.x, p.y, p.w, 10); // Kar katmanı
         });
 
         ctx.font = "70px Arial";
@@ -216,7 +205,7 @@
 
         ctx.fillStyle = "#fff";
         ctx.font = "bold 40px Arial";
-        ctx.fillText("HEDİYE: " + score, 40, 80);
+        ctx.fillText("SKOR: " + score, 40, 80);
     }
 </script>
 </body>
