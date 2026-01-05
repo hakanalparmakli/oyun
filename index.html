@@ -7,36 +7,41 @@
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        body { margin: 0; background: #000; color: #fff; overflow: hidden; font-family: sans-serif; }
+        body { margin: 0; background: #000; color: #fff; overflow: hidden; font-family: 'Arial Rounded MT Bold', sans-serif; }
         canvas { display: block; }
         #setup-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: #000; z-index: 10;
+            background: radial-gradient(circle at center, #112 0%, #000 70%); z-index: 10;
+            color: #0ff;
+            text-shadow: 0 0 20px #0ff;
         }
-        #qrcode { padding: 15px; background: white; border-radius: 10px; }
-        
-        /* TELEFON KUMANDASI - EKRANI KAPLAYAN BUTONLAR */
+        #qrcode { padding: 20px; background: rgba(255,255,255,0.9); border-radius: 20px; box-shadow: 0 0 30px #0ff; }
+        #status { font-size: 2.5em; margin-top: 20px; text-shadow: 0 0 15px #0ff; }
+
+        /* Mobil Kumanda */
         #mobile-controller {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; touch-action: none;
+            background: rgba(0,0,0,0.4); touch-action: none; z-index: 5;
         }
-        .pad { display: flex; height: 100%; width: 100%; }
+        .pad { display: flex; height: 100%; width: 100%; align-items: center; justify-content: center; }
         .side { flex: 1; display: flex; flex-direction: column; }
         .jump-zone {
-            flex: 2; border: 8px solid #fff; background: rgba(255, 0, 0, 0.5);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 100px; font-weight: bold; margin: 10px; border-radius: 60px;
+            flex: 2; background: radial-gradient(#f00, #900); border: 8px solid #fff;
+            box-shadow: 0 0 40px #f00; border-radius: 80px; margin: 20px;
+            font-size: 120px; display: flex; align-items: center; justify-content: center;
         }
         .btn-dir {
-            flex: 1; border: 4px solid #fff; display: flex; align-items: center; justify-content: center;
-            font-size: 100px; margin: 10px; border-radius: 60px; background: rgba(255, 255, 255, 0.1);
+            flex: 1; background: radial-gradient(#0ff, #099); border: 6px solid #fff;
+            box-shadow: 0 0 30px #0ff; border-radius: 80px; margin: 20px;
+            font-size: 120px; display: flex; align-items: center; justify-content: center;
         }
     </style>
 </head>
 <body>
 
     <div id="setup-screen">
+        <h1 style="font-size:3em; margin-bottom:20px;">🎅 Sonsuz Köprü 🎄</h1>
         <div id="qrcode"></div>
         <h2 id="status">BAĞLAN VE OYNA</h2>
     </div>
@@ -62,11 +67,26 @@
     const urlParams = new URLSearchParams(window.location.search);
     const peerIdParam = urlParams.get('peer');
 
+    // Kar taneleri için particle sistemi
+    let particles = [];
+    const particleCount = 150;
+    function initParticles() {
+        for(let i = 0; i < particleCount; i++) {
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                r: Math.random() * 4 + 1,
+                d: Math.random() * particleCount,
+                speed: Math.random() * 1 + 0.5
+            });
+        }
+    }
+
     if (!peerIdParam) {
         peer.on('open', (id) => {
             new QRCode(document.getElementById("qrcode"), {
                 text: window.location.href + "?peer=" + id,
-                width: 250, height: 250
+                width: 280, height: 280, colorDark: "#0ff", colorLight: "#fff"
             });
         });
         peer.on('connection', (c) => {
@@ -87,6 +107,8 @@
                 const el = document.getElementById(id);
                 el.addEventListener('touchstart', (e) => { e.preventDefault(); if(conn) conn.send({key: keyName, pressed: true}); });
                 el.addEventListener('touchend', (e) => { e.preventDefault(); if(conn) conn.send({key: keyName, pressed: false}); });
+                el.addEventListener('mousedown', (e) => { e.preventDefault(); if(conn) conn.send({key: keyName, pressed: true}); });
+                el.addEventListener('mouseup', (e) => { e.preventDefault(); if(conn) conn.send({key: keyName, pressed: false}); });
             };
             bindBtn('btn-left', 'left'); bindBtn('btn-right', 'right'); bindBtn('btn-up', 'up');
         });
@@ -97,60 +119,57 @@
     function initGame() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
+        initParticles();
         score = 0;
         santa = { 
             x: 100, y: canvas.height - 400, 
-            w: 100, h: 110, 
+            w: 120, h: 140, 
             vx: 0, vy: 0, 
-            jumpForce: -32, 
-            grounded: false 
+            jumpForce: -34, 
+            grounded: false,
+            angle: 0
         };
-        // İlk zemin devasa
-        platforms = [{ x: 0, y: canvas.height - 150, w: 1500, h: 50 }];
+        platforms = [{ x: 0, y: canvas.height - 150, w: 1800, h: 80 }];
         gifts = [];
-        for(let i=0; i<40; i++) spawnPlatform();
+        for(let i=0; i<50; i++) spawnPlatform();
         requestAnimationFrame(update);
     }
 
     function spawnPlatform() {
         const last = platforms[platforms.length - 1];
-        
-        // --- BLOKLARIN KAYBOLMAMASI İÇİN KESİN AYARLAR ---
-        // Yatayda boşluk neredeyse yok (Maksimum 30 piksel)
-        const xGap = Math.random() * 30; 
-        // Dikeyde sadece küçük basamaklar (Maksimum 60 piksel yukarı/aşağı)
-        const yGap = (Math.random() - 0.5) * 120; 
-        
+        const xGap = Math.random() * 40;
+        const yGap = (Math.random() - 0.5) * 140;
         const x = last.x + last.w + xGap;
-        let y = Math.max(400, Math.min(canvas.height - 150, last.y + yGap));
-        const w = 600 + Math.random() * 400; // Bloklar dev gibi
+        let y = Math.max(300, Math.min(canvas.height - 150, last.y + yGap));
+        const w = 700 + Math.random() * 600;
 
-        platforms.push({ x, y, w, h: 50 });
-        if(Math.random() > 0.4) gifts.push({ x: x + w/2, y: y - 100, active: true });
+        platforms.push({ x, y, w, h: 80 });
+        if(Math.random() > 0.3) gifts.push({ x: x + w/2 - 30, y: y - 120, active: true });
     }
 
     function update() {
-        let speed = 16;
+        const speed = 18;
         if (keys.left) santa.vx = -speed;
         else if (keys.right) santa.vx = speed;
-        else santa.vx *= 0.85;
+        else santa.vx *= 0.82;
 
         if (keys.up && santa.grounded) {
             santa.vy = santa.jumpForce;
             santa.grounded = false;
         }
 
-        santa.vy += 0.8;
+        santa.vy += 0.85;
         santa.x += santa.vx;
         santa.y += santa.vy;
         santa.grounded = false;
+        santa.angle += 0.1; // Sallanma animasyonu
 
         platforms.forEach(p => {
             if (santa.vy >= 0 && 
-                santa.x + 20 < p.x + p.w && 
-                santa.x + santa.w - 20 > p.x && 
+                santa.x + 30 < p.x + p.w && 
+                santa.x + santa.w - 30 > p.x && 
                 santa.y + santa.h > p.y && 
-                santa.y + santa.h < p.y + p.h + santa.vy + 10) {
+                santa.y + santa.h < p.y + p.h + santa.vy + 15) {
                 
                 santa.grounded = true;
                 santa.vy = 0;
@@ -159,52 +178,117 @@
         });
 
         gifts.forEach(g => {
-            if (g.active && Math.abs(santa.x - g.x) < 120 && Math.abs(santa.y - g.y) < 150) {
+            if (g.active && Math.abs(santa.x + santa.w/2 - g.x) < 100 && Math.abs(santa.y + santa.h/2 - g.y) < 120) {
                 g.active = false;
                 score++;
-                if (platforms.length < score + 40) spawnPlatform();
+                if (platforms.length < score + 50) spawnPlatform();
             }
         });
 
-        // Düşerse hemen kaldığı yere en yakın bloğa at
-        if (santa.y > canvas.height + 200) {
-            const restart = platforms.find(p => p.x > santa.x - 500) || platforms[0];
-            santa.x = restart.x + 50;
+        if (santa.y > canvas.height + 300) {
+            const restart = platforms.find(p => p.x > santa.x - 600) || platforms[0];
+            santa.x = restart.x + 100;
             santa.y = restart.y - 400;
             santa.vy = 0;
         }
+
+        // Kar particle güncelleme
+        let angle = 0;
+        angle += 0.01;
+        particles.forEach(p => {
+            p.y += Math.cos(angle + p.d) + p.speed + p.r / 2;
+            p.x += Math.sin(angle) * 2;
+            if (p.y > canvas.height) p.y = -10;
+            if (p.x > canvas.width) p.x = 0;
+            if (p.x < 0) p.x = canvas.width;
+        });
 
         draw();
         requestAnimationFrame(update);
     }
 
     function draw() {
-        ctx.fillStyle = "#000"; 
+        // Arka plan: Noel gecesi gökyüzü
+        const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grad.addColorStop(0, '#001133');
+        grad.addColorStop(0.5, '#003366');
+        grad.addColorStop(1, '#000011');
+        ctx.fillStyle = grad;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Kamera Noel Baba'nın her zaman blokları görmesini sağlar
-        const camX = -santa.x + 200;
+        // Yıldızlar
+        ctx.fillStyle = '#fff';
+        for(let i = 0; i < 100; i++) {
+            const x = (i * 73) % canvas.width;
+            const y = (i * 97) % canvas.height * 0.6;
+            const size = Math.random() * 2;
+            ctx.globalAlpha = Math.random();
+            ctx.fillRect(x, y, size, size);
+        }
+        ctx.globalAlpha = 1;
+
+        // Kar taneleri
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        particles.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Kamera
+        const camX = -santa.x + canvas.width / 4;
         ctx.save();
         ctx.translate(camX, 0);
 
+        // Platformlar (buzlu/karlı)
         platforms.forEach(p => {
-            ctx.fillStyle = "#00FFDD"; 
+            // Ana buz platform
+            const platGrad = ctx.createLinearGradient(p.x, p.y, p.x, p.y + p.h);
+            platGrad.addColorStop(0, '#66ffff');
+            platGrad.addColorStop(1, '#0088ff');
+            ctx.fillStyle = platGrad;
             ctx.fillRect(p.x, p.y, p.w, p.h);
-            ctx.fillStyle = "#FFF";
-            ctx.fillRect(p.x, p.y, p.w, 15); // Parlak üst yüzey
+
+            // Kar üst katmanı
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(p.x, p.y, p.w, 20);
+
+            // Glow efekti
+            ctx.shadowBlur = 30;
+            ctx.shadowColor = '#00ffff';
+            ctx.fillRect(p.x, p.y, p.w, p.h);
+            ctx.shadowBlur = 0;
         });
 
-        ctx.font = "90px Arial";
-        gifts.forEach(g => { if(g.active) ctx.fillText("🎁", g.x, g.y); });
-        
-        ctx.font = "160px Arial"; 
-        ctx.fillText("🎅", santa.x, santa.y + 120);
-        
+        // Hediyeler (parlayan yıldız/noel topu)
+        ctx.font = "100px Arial";
+        gifts.forEach(g => {
+            if(g.active) {
+                ctx.shadowBlur = 40;
+                ctx.shadowColor = '#ffff00';
+                ctx.fillText("⭐", g.x, g.y);
+                ctx.shadowBlur = 0;
+            }
+        });
+
+        // Noel Baba (daha büyük ve sallanmalı)
+        ctx.save();
+        ctx.translate(santa.x + santa.w/2, santa.y + santa.h/2);
+        ctx.rotate(Math.sin(santa.angle) * 0.1);
+        ctx.translate(-santa.w/2, -santa.h/2);
+        ctx.font = "200px Arial";
+        ctx.fillText("🎅", -20, 160);
         ctx.restore();
 
+        ctx.restore();
+
+        // Skor
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#00ffff';
         ctx.fillStyle = "#fff";
-        ctx.font = "bold 50px Arial";
-        ctx.fillText("SKOR: " + score, 60, 90);
+        ctx.font = "bold 60px Arial";
+        ctx.fillText("SKOR: " + score, 80, 100);
+        ctx.shadowBlur = 0;
     }
 </script>
 </body>
