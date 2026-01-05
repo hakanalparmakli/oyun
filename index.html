@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>QR Kontrollü Noel Baba</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body { margin: 0; background: #050505; color: white; overflow: hidden; font-family: 'Arial', sans-serif; }
+        canvas { display: block; }
+        
+        /* Başlangıç Ekranı ve QR */
+        #setup-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.9); z-index: 10;
+        }
+        #qrcode { padding: 20px; background: white; border-radius: 10px; }
+        
+        /* Mobil Kumanda Arayüzü */
+        #mobile-controller {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #111; touch-action: none;
+        }
+        .pad { display: flex; justify-content: space-around; align-items: center; height: 100%; }
+        .btn {
+            width: 100px; height: 100px; background: rgba(255,255,255,0.1);
+            border: 3px solid white; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; font-size: 40px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="setup-screen">
+        <h2>Oynamak İçin Tara</h2>
+        <div id="qrcode"></div>
+        <p id="status">Bağlantı bekleniyor...</p>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="mobile-controller">
+        <div class="pad">
+            <div class="btn" id="btn-left">◀</div>
+            <div class="btn" id="btn-up">▲</div>
+            <div class="btn" id="btn-right">▶</div>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusText = document.getElementById('status');
+    const urlParams = new URLSearchParams(window.location.search);
+    const peerIdParam = urlParams.get('peer');
+
+    // PeerJS Yapılandırması
+    const peer = new Peer();
+    let conn;
+
+    // --- SENARYO 1: BİLGİSAYAR (ANA EKRAN) ---
+    if (!peerIdParam) {
+        peer.on('open', (id) => {
+            const connectUrl = window.location.href + "?peer=" + id;
+            new QRCode(document.getElementById("qrcode"), {
+                text: connectUrl,
+                width: 256,
+                height: 256
+            });
+        });
+
+        peer.on('connection', (c) => {
+            conn = c;
+            statusText.innerText = "Bağlandı! Oyun Başlıyor...";
+            setTimeout(() => {
+                document.getElementById('setup-screen').style.display = 'none';
+                initGame();
+            }, 1000);
+
+            conn.on('data', (data) => {
+                keys[data.key] = data.pressed;
+            });
+        });
+    } 
+    // --- SENARYO 2: TELEFON (KUMANDA) ---
+    else {
+        document.getElementById('setup-screen').style.display = 'none';
+        document.getElementById('mobile-controller').style.display = 'block';
+        
+        const remotePeerId = peerIdParam;
+        peer.on('open', () => {
+            conn = peer.connect(remotePeerId);
+            conn.on('open', () => {
+                console.log("Bağlantı kuruldu!");
+            });
+        });
+
+        const bindBtn = (id, keyName) => {
+            const el = document.getElementById(id);
+            const send = (pressed) => { if(conn) conn.send({key: keyName, pressed: pressed}); };
+            el.addEventListener('touchstart', (e) => { e.preventDefault(); send(true); el.style.background = "#fff"; });
+            el.addEventListener('touchend', (e) => { e.preventDefault(); send(false); el.style.background = "none"; });
+        };
+        bindBtn('btn-left', 'left');
+        bindBtn('btn-right', 'right');
+        bindBtn('btn-up', 'up');
+    }
+
+    // --- OYUN MANTIĞI ---
+    let keys = { left: false, right: false, up: false };
+    let santa, platforms, gifts, score;
+
+    function initGame() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        score = 0;
+        santa = { x: 100, y: 0, w: 50, h: 60, vx: 0, vy: 0, jump: -15, ground: false };
+        platforms = [{ x: 0, y: canvas.height - 50, w: 2000, h: 50 }];
+        gifts = [];
+        for(let i=0; i<10; i++) spawnPlatform();
+        requestAnimationFrame(update);
+    }
+
+    function spawnPlatform() {
+        const last = platforms[platforms.length - 1];
+        const x = last.x + 250 + Math.random() * 100;
+        const y = canvas.height - 100 - Math.random() * 300;
+        const w = 150 + Math.random() * 150;
+        platforms.push({ x, y, w, h: 20 });
+        if(Math.random() > 0.5) gifts.push({ x: x + w/2 - 15, y: y - 40, w: 30, h: 30, active: true });
+    }
+
+    function update() {
+        if (keys.left) santa.vx = -6;
+        else if (keys.right) santa.vx = 6;
+        else santa.vx = 0;
+
+        if (keys.up && santa.ground) { santa.vy = santa.jump; santa.ground = false; }
+
+        santa.vy += 0.8;
+        santa.x += santa.vx;
+        santa.y += santa.vy;
+        santa.ground = false;
+
+        platforms.forEach(p => {
+            if (santa.x < p.x + p.w && santa.x + santa.w > p.x && 
+                santa.y + santa.h > p.y && santa.y + santa.h < p.y + p.h + santa.vy) {
+                santa.ground = true; santa.vy = 0; santa.y = p.y - santa.h;
+            }
+        });
+
+        gifts.forEach(g => {
+            if (g.active && santa.x < g.x + g.w && santa.x + santa.w > g.x && santa.y < g.y + g.h && santa.y + santa.h > g.y) {
+                g.active = false; score++; spawnPlatform();
+            }
+        });
+
+        if (santa.y > canvas.height) { santa.y = 0; santa.x = 100; }
+
+        draw();
+        requestAnimationFrame(update);
+    }
+
+    function draw() {
+        ctx.fillStyle = "#050505"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const camX = -santa.x + 150;
+        ctx.save(); ctx.translate(camX, 0);
+
+        ctx.fillStyle = "#333";
+        platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
+        
+        gifts.forEach(g => { if(g.active) { ctx.font = "30px Arial"; ctx.fillText("🎁", g.x, g.y + 25); }});
+        
+        ctx.font = "50px Arial"; ctx.fillText("🎅", santa.x, santa.y + 50);
+        ctx.restore();
+
+        ctx.fillStyle = "gold"; ctx.font = "24px Arial"; ctx.fillText("Hediyeler: " + score, 20, 40);
+    }
+</script>
+</body>
+</html>
