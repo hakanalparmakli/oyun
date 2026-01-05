@@ -21,7 +21,7 @@ canvas{display:block}
 #countdown{
  position:absolute;inset:0;display:none;
  justify-content:center;align-items:center;
- font-size:150px;font-weight:bold;z-index:20
+ font-size:150px;font-weight:bold;z-index:20;color:#fff
 }
 #qrcode{background:#fff;padding:20px;border-radius:10px;margin-bottom:20px}
 #playerCount,#order{font-size:24px;margin-top:10px}
@@ -110,11 +110,13 @@ function renderOrder(){
  order.innerHTML="<h2>Oyun Sırası</h2>"+players.map((p,i)=>`${i+1}. ${p.name}`).join("<br>");
 }
 
-// 10 saniye bekle + 3 saniye geri sayma
+// 20 saniye bekle + 3 saniye geri sayma
 function waitAndStart(){
  gameActive=true;
  countdown.style.display="flex";
- let wait=10;
+ overlay.style.display="none"; // QR ve setup ekranı kaybolur
+ setup.style.display="none";
+ let wait=20;
  countdown.innerText=`Başlıyor: ${wait}`;
  const waitInterval=setInterval(()=>{
    wait--;
@@ -130,13 +132,13 @@ function waitAndStart(){
 function startCountdown3(){
  let count=3;
  countdown.innerText=count;
+ countdown.style.display="flex";
  const i=setInterval(()=>{
    count--;
    if(count>0) countdown.innerText=count;
    else{
      clearInterval(i);
      countdown.style.display="none";
-     overlay.style.display="none";
      startTurn();
    }
  },1000);
