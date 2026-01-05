@@ -15,7 +15,6 @@
  -webkit-touch-callout:none;
  touch-action:none;
 }
-
 body{
  margin:0;background:#000;color:#fff;
  font-family:Arial;overflow:hidden
@@ -27,47 +26,32 @@ canvas{display:block}
  flex-direction:column;justify-content:center;align-items:center;
  background:#000;z-index:10
 }
-
 #countdown{
  position:absolute;inset:0;display:none;
  justify-content:center;align-items:center;
  font-size:200px;font-weight:bold;z-index:20
 }
-
-#qrcode{background:#fff;padding:20px;border-radius:10px}
+#qrcode{background:#fff;padding:20px;border-radius:10px;margin-bottom:20px}
+#playerCount{font-size:32px;margin-top:10px}
 
 #mobile{
- display:none;position:fixed;inset:0;
- background:#000;
+ display:none;position:fixed;inset:0;background:#000
 }
-
 .pad{
  display:grid;
  grid-template-columns:1fr 1fr 1fr;
  height:100%;
- align-items:center;
+ align-items:center
 }
-
 .btn{
- font-size:60px;
- border:4px solid #fff;
- border-radius:30px;
- width:85%;
- height:45%;
- display:flex;
- justify-content:center;
- align-items:center;
- margin:auto;
+ font-size:60px;border:4px solid #fff;
+ border-radius:30px;width:85%;height:45%;
+ display:flex;justify-content:center;align-items:center;
+ margin:auto
 }
+.jump{background:rgba(255,0,0,.3);font-size:70px}
 
-.jump{
- background:rgba(255,0,0,.3);
- font-size:70px;
-}
-
-input,button{
- font-size:30px;padding:15px;margin:10px
-}
+input,button{font-size:30px;padding:15px;margin:10px}
 </style>
 </head>
 
@@ -75,6 +59,7 @@ input,button{
 
 <div id="setup">
  <div id="qrcode"></div>
+ <div id="playerCount">Oyuncular: 0 / 10</div>
  <h1 id="status">BAĞLAN</h1>
 </div>
 
@@ -111,12 +96,13 @@ const url=new URLSearchParams(location.search);
 const peerId=url.get("peer");
 
 const MAX=10;
-let players={},finishedPlayers=0;
-let gameStarted=false,waitStarted=false;
+let players={},gameStarted=false,waitStarted=false;
 let keys={left:false,right:false,up:false};
 
-let santa,platforms;
+let santa,platforms=[];
 let checkpoint={x:0,y:0};
+let lastPlatformX=0;
+let platformCount=0;
 let countdownValue=3;
 
 /* ================= HOST ================= */
@@ -132,9 +118,10 @@ peer.on("open",id=>{
 peer.on("connection",c=>{
  c.on("data",data=>{
   if(data.type==="join"){
-   players[c.peer]={name:data.name,score:0,finished:false};
-   status.innerText=`Oyuncular: ${Object.keys(players).length}/${MAX}`;
-   if(Object.keys(players).length===MAX) startCountdown();
+   players[c.peer]={name:data.name};
+   const count=Object.keys(players).length;
+   playerCount.innerText=`Oyuncular: ${count} / ${MAX}`;
+   if(count===MAX) startCountdown();
    else if(!waitStarted) waitAndCountdown();
   }
   if(data.type==="key") keys[data.key]=data.pressed;
@@ -169,25 +156,36 @@ function startGame(){
 /* ================= GAME ================= */
 function initGame(){
  santa={x:100,y:200,w:80,h:90,vx:0,vy:0,ground:false};
- platforms=[{x:0,y:canvas.height-120,w:800,h:30,checkpoint:true}];
- checkpoint={x:50,y:canvas.height-300};
+ platforms=[];
+ lastPlatformX=0;
+ platformCount=0;
 
- for(let i=0;i<25;i++) spawn();
+ addPlatform(true); // ilk checkpoint
+ for(let i=0;i<10;i++) addPlatform();
+
+ checkpoint={x:50,y:canvas.height-300};
  requestAnimationFrame(loop);
 }
 
-function spawn(){
- let last=platforms[platforms.length-1];
- let gap=140+Math.random()*140;
- let x=last.x+last.w+gap;
- let y=Math.max(220,last.y+(Math.random()-0.5)*120);
- let w=250+Math.random()*200;
- let isCheckpoint=Math.random()<0.2;
+function addPlatform(forceCheckpoint=false){
+ let gap=220+Math.random()*140;
+ let x=lastPlatformX+gap;
+ let y=Math.max(220,canvas.height-200+(Math.random()-0.5)*160);
+ let w=260+Math.random()*180;
+
+ platformCount++;
+ let isCheckpoint = forceCheckpoint || platformCount % 12 === 0; // 🔥 DAHA UZAK
+
  platforms.push({x,y,w,h:30,checkpoint:isCheckpoint});
+ lastPlatformX=x+w;
 }
 
 function loop(){
  if(!gameStarted)return;
+
+ if(santa.x+canvas.width>lastPlatformX-800){
+  addPlatform();
+ }
 
  if(keys.left)santa.vx=-10;
  else if(keys.right)santa.vx=10;
@@ -272,7 +270,6 @@ peer.on("open",()=>{
    ev.preventDefault();
    conn.send({type:"key",key,pressed:true});
   },{passive:false});
-
   e.addEventListener("touchend",ev=>{
    ev.preventDefault();
    conn.send({type:"key",key,pressed:false});
