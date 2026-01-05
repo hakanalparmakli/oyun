@@ -164,10 +164,10 @@ platforms=[{x:0,y:canvas.height-120,w:600,h:30,checkpoint:true}];
 
 let x=600,platIndex=1;
 while(x<finishX){
- let gap=220+Math.random()*150; // zorluk için boşluk
+ let gap=220+Math.random()*150;
  let w=200+Math.random()*100;
- let y=canvas.height-200+(Math.random()-0.5)*150; // yükseklik farkları
- let checkpoint=(platIndex%10===0); // her 10 platform checkpoint
+ let y=canvas.height-200+(Math.random()-0.5)*150;
+ let checkpoint=(platIndex%10===0);
  platforms.push({x,y,w,h:30,checkpoint});
  x+=w+gap;
  platIndex++;
@@ -217,7 +217,6 @@ function loop(){
   ctx.fillRect(p.x,p.y,p.w,p.h);
  });
 
-// Bitiş çizgisi
  ctx.fillStyle="#f00";
  ctx.fillRect(finishX,0,20,canvas.height);
 
@@ -257,11 +256,33 @@ peer.on("open",()=>{
  joinBtn.addEventListener("click",sendJoin);
  joinBtn.addEventListener("touchstart",e=>{ e.preventDefault(); sendJoin(); },{passive:false});
 
+ // Stabil tuşlar
  ["left","right","up"].forEach((k,i)=>{
-  const id=i==0?"left":i==1?"right":"jump";
-  const el=document.getElementById(id);
-  el.addEventListener("touchstart",e=>{e.preventDefault();conn.send({type:"key",key:k,pressed:true});},{passive:false});
-  el.addEventListener("touchend",e=>{e.preventDefault();conn.send({type:"key",key:k,pressed:false});},{passive:false});
+  const id = i===0 ? "left" : i===1 ? "right" : "jump";
+  const el = document.getElementById(id);
+
+  let isPressed = false;
+
+  const startTouch = e => {
+    e.preventDefault();
+    if(!isPressed){
+      isPressed = true;
+      conn.send({type:"key", key:k, pressed:true});
+    }
+  };
+
+  const endTouch = e => {
+    e.preventDefault();
+    if(isPressed){
+      isPressed = false;
+      conn.send({type:"key", key:k, pressed:false});
+    }
+  };
+
+  el.addEventListener("touchstart", startTouch, {passive:false});
+  el.addEventListener("touchend", endTouch, {passive:false});
+  el.addEventListener("touchcancel", endTouch, {passive:false});
+  el.addEventListener("touchleave", endTouch, {passive:false});
  });
 });
 }
