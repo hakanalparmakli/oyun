@@ -15,10 +15,7 @@
  -webkit-touch-callout:none;
  touch-action:none;
 }
-body{
- margin:0;background:#000;color:#fff;
- font-family:Arial;overflow:hidden
-}
+body{margin:0;background:#000;color:#fff;font-family:Arial;overflow:hidden}
 canvas{display:block}
 
 #setup,#nameScreen,#endScreen{
@@ -34,9 +31,7 @@ canvas{display:block}
 #qrcode{background:#fff;padding:20px;border-radius:10px;margin-bottom:20px}
 #playerCount{font-size:32px;margin-top:10px}
 
-#mobile{
- display:none;position:fixed;inset:0;background:#000
-}
+#mobile{display:none;position:fixed;inset:0;background:#000}
 .pad{
  display:grid;
  grid-template-columns:1fr 1fr 1fr;
@@ -79,8 +74,6 @@ input,button{font-size:30px;padding:15px;margin:10px}
  </div>
 </div>
 
-<div id="endScreen" style="display:none"></div>
-
 <canvas id="c"></canvas>
 
 <script>
@@ -100,7 +93,7 @@ let players={},gameStarted=false,waitStarted=false;
 let keys={left:false,right:false,up:false};
 
 let santa,platforms=[];
-let checkpoint={x:0,y:0};
+let checkpointPlatform=null;
 let lastPlatformX=0;
 let platformCount=0;
 let countdownValue=3;
@@ -163,7 +156,7 @@ function initGame(){
  addPlatform(true); // ilk checkpoint
  for(let i=0;i<10;i++) addPlatform();
 
- checkpoint={x:50,y:canvas.height-300};
+ checkpointPlatform=platforms[0];
  requestAnimationFrame(loop);
 }
 
@@ -174,9 +167,10 @@ function addPlatform(forceCheckpoint=false){
  let w=260+Math.random()*180;
 
  platformCount++;
- let isCheckpoint = forceCheckpoint || platformCount % 12 === 0; // 🔥 DAHA UZAK
+ let isCheckpoint = forceCheckpoint || platformCount % 12 === 0;
 
- platforms.push({x,y,w,h:30,checkpoint:isCheckpoint});
+ const p={x,y,w,h:30,checkpoint:isCheckpoint};
+ platforms.push(p);
  lastPlatformX=x+w;
 }
 
@@ -210,17 +204,19 @@ function loop(){
    santa.ground=true;
    santa.vy=0;
    santa.y=p.y-santa.h;
+
    if(p.checkpoint){
-    checkpoint.x=p.x+20;
-    checkpoint.y=p.y-300;
+    checkpointPlatform=p; // 🔥 PLATFORMUN KENDİSİ
    }
   }
  });
 
- if(santa.y>canvas.height+200){
-  santa.x=checkpoint.x;
-  santa.y=checkpoint.y;
-  santa.vy=0;
+ if(santa.y>canvas.height+200 && checkpointPlatform){
+  santa.x = checkpointPlatform.x + checkpointPlatform.w/2 - santa.w/2;
+  santa.y = checkpointPlatform.y - santa.h;
+  santa.vx = 0;
+  santa.vy = 0;
+  santa.ground = true;
  }
 
  draw();
