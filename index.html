@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Garantili Noel Baba - Checkpointli</title>
+<title>Garantili Noel Baba - Puanlı</title>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -83,7 +83,7 @@ const params=new URLSearchParams(location.search);
 const peerId=params.get("peer");
 
 let players=[],currentIndex=0,activePeer=null,keys={left:false,right:false,up:false};
-let gameActive=false,santa,platforms=[],finishX=4000,lastCheckpoint={x:50,y:200};
+let gameActive=false,santa,platforms=[],finishX=6000,lastCheckpoint={x:50,y:200},startTime=0,falls=0;
 
 /* ================= HOST ================= */
 if(!peerId){
@@ -95,7 +95,7 @@ peer.on("open",id=>{
 peer.on("connection",c=>{
  c.on("data",d=>{
   if(d.type==="join"){
-   players.push({peer:c.peer,name:d.name,score:0});
+   players.push({peer:c.peer,name:d.name,score:0,time:0,falls:0});
    playerCount.innerText=`Oyuncular: ${players.length} / 10`;
    renderOrder();
    if(!gameActive && players.length>0) waitAndStart();
@@ -110,17 +110,13 @@ function renderOrder(){
  order.innerHTML="<h2>Oyun Sırası</h2>"+players.map((p,i)=>`${i+1}. ${p.name}`).join("<br>");
 }
 
-// 20 saniye boyunca QR ekranda bekle
 function waitAndStart(){
  gameActive=true;
  overlay.style.display="none";
- setup.style.display="flex"; // QR görünür
- setTimeout(()=>{
-   startCountdown3(); // 20 sn sonra 3,2,1 başlar
- },20000);
+ setup.style.display="flex";
+ setTimeout(()=>{ startCountdown3(); },20000);
 }
 
-// 3,2,1 geri sayımı
 function startCountdown3(){
  let count=3;
  countdown.innerText=count;
@@ -139,19 +135,24 @@ function startCountdown3(){
 
 function startTurn(){
  if(currentIndex>=players.length){
-  overlay.innerHTML="<h1>Oyun Bitti!</h1>"+players
-   .sort((a,b)=>b.score-a.score)
-   .map((p,i)=>`${i+1}. ${p.name} - ${p.score}`).join("<br>");
+  // tüm oyuncular bitince skor tablosu
+  let sorted=players.slice().sort((a,b)=>{
+   if(a.time!==b.time) return a.time-b.time;
+   return a.falls-b.falls;
+  });
+  overlay.innerHTML="<h1>Oyun Bitti!</h1>"+sorted.map((p,i)=>`${i+1}. ${p.name} - ${p.time.toFixed(1)}s - ${p.falls} düşme`).join("<br>");
   overlay.style.display="flex";
   return;
  }
  const p=players[currentIndex];
  activePeer=p.peer;
+ falls=0;
  overlay.innerHTML=`<h1>Şimdi Oynuyor</h1><h2>${p.name}</h2>`;
  overlay.style.display="flex";
  setTimeout(()=>{
   overlay.style.display="none";
   initGame();
+  startTime=Date.now();
  },1500);
 }
 
@@ -167,7 +168,7 @@ while(x<finishX){
  let gap=220+Math.random()*120;
  let w=260;
  let y=canvas.height-200+(Math.random()-0.5)*120;
- let checkpoint=(platIndex%5===0); // her 5. platform checkpoint
+ let checkpoint=(platIndex%5===0);
  platforms.push({x,y,w,h:30,checkpoint});
  x+=w+gap;
  platIndex++;
@@ -197,10 +198,7 @@ function loop(){
    santa.ground=true;
    santa.vy=0;
    santa.y=p.y-santa.h;
-
-   if(p.checkpoint){
-     lastCheckpoint={x:santa.x,y:santa.y};
-   }
+   if(p.checkpoint) lastCheckpoint={x:santa.x,y:santa.y};
   }
  });
 
@@ -210,6 +208,7 @@ function loop(){
    santa.y=lastCheckpoint.y;
    santa.vx=0;
    santa.vy=0;
+   falls++;
  }
 
  ctx.save();
@@ -220,12 +219,19 @@ function loop(){
   ctx.fillRect(p.x,p.y,p.w,p.h);
  });
 
+// Bitiş çizgisi
+ ctx.fillStyle="#f00";
+ ctx.fillRect(finishX,0,20,canvas.height);
+
  ctx.font="120px Arial";
  ctx.fillText("🎅",santa.x,santa.y+100);
  ctx.restore();
 
- if(santa.x>finishX){
-  players[currentIndex].score=Math.floor(10000/Date.now()%1000);
+ // bitiş
+ if(santa.x+80>finishX){
+  const timeElapsed=(Date.now()-startTime)/1000;
+  players[currentIndex].time=timeElapsed;
+  players[currentIndex].falls=falls;
   currentIndex++;
   keys={left:false,right:false,up:false};
   startTurn();
