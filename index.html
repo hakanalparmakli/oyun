@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Noel Baba Projeksiyon Modu</title>
+    <title>Süper Noel Baba - Projeksiyon</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
@@ -15,31 +15,55 @@
             background: #000; z-index: 10;
         }
         #qrcode { padding: 15px; background: white; border-radius: 10px; }
+        
+        /* TELEFON KUMANDASI İÇİN DEVASA BUTONLAR */
         #mobile-controller {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #111; touch-action: none;
+            background: #000; touch-action: none;
         }
-        .pad { display: grid; grid-template-columns: 1fr 1fr 1fr; height: 100%; padding: 20px; gap: 15px; }
-        .btn {
-            background: rgba(255,255,255,0.1); border: 3px solid #555; border-radius: 20px;
-            display: flex; align-items: center; justify-content: center; font-size: 60px; color: white;
+        .pad { 
+            display: flex; 
+            height: 100%; 
+            width: 100%;
         }
-        .btn:active { background: #ff0000; }
+        .btn-side {
+            flex: 1; /* Sol ve Sağ için ekranın %25'i */
+            display: flex; flex-direction: column;
+        }
+        .btn-jump {
+            flex: 2; /* Zıplama için ekranın %50'si */
+            border: 4px solid #fff;
+            background: rgba(255, 0, 0, 0.2);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 80px; font-weight: bold; margin: 10px; border-radius: 30px;
+        }
+        .direction {
+            flex: 1; border: 4px solid #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 80px; margin: 10px; border-radius: 30px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .btn:active { background: #ff0000 !important; color: white; }
     </style>
 </head>
 <body>
 
     <div id="setup-screen">
         <div id="qrcode"></div>
-        <h2 id="status">OYUNU BAŞLATMAK İÇİN TARA</h2>
+        <h2 id="status">BAĞLAN VE ZIPLA!</h2>
     </div>
+    
     <canvas id="gameCanvas"></canvas>
 
     <div id="mobile-controller">
         <div class="pad">
-            <div id="btn-left" class="btn">◀</div>
-            <div id="btn-up" class="btn">▲</div>
-            <div id="btn-right" class="btn">▶</div>
+            <div class="btn-side">
+                <div id="btn-left" class="direction btn">◀</div>
+            </div>
+            <div id="btn-up" class="btn-jump btn">ZIPLA</div>
+            <div class="btn-side">
+                <div id="btn-right" class="direction btn">▶</div>
+            </div>
         </div>
     </div>
 
@@ -63,7 +87,7 @@
         });
         peer.on('connection', (c) => {
             conn = c;
-            statusText.innerText = "BAĞLANDI!";
+            statusText.innerText = "BAŞLIYOR...";
             setTimeout(() => {
                 document.getElementById('setup-screen').style.display = 'none';
                 initGame();
@@ -92,13 +116,12 @@
         score = 0;
         santa = { 
             x: 100, y: canvas.height - 300, 
-            w: 80, h: 90, 
+            w: 90, h: 100, 
             vx: 0, vy: 0, 
-            jumpForce: -22, 
+            jumpForce: -26, // Zıplama gücü daha da artırıldı
             grounded: false 
         };
-        // Başlangıç platformunu uzun tutalım
-        platforms = [{ x: 50, y: canvas.height - 150, w: 600, h: 25 }];
+        platforms = [{ x: 50, y: canvas.height - 150, w: 800, h: 30 }];
         gifts = [];
         for(let i=0; i<15; i++) spawnPlatform();
         requestAnimationFrame(update);
@@ -106,48 +129,42 @@
 
     function spawnPlatform() {
         const last = platforms[platforms.length - 1];
-        
-        // --- MESAFE AYARLARI (KRİTİK) ---
-        // Yatay mesafe çok daraltıldı: 50-120 piksel (Noel Baba'nın boyu kadar)
-        const xGap = 50 + Math.random() * 70; 
-        // Dikey fark Noel Baba'nın zıplayabileceği yarım mesafeyi geçemez
-        const yGap = (Math.random() - 0.5) * 150; 
+        // Platformlar çok daha yakın ve güvenli
+        const xGap = 40 + Math.random() * 60; 
+        const yGap = (Math.random() - 0.5) * 120; 
         
         const x = last.x + last.w + xGap;
-        let y = Math.max(250, Math.min(canvas.height - 180, last.y + yGap));
-        const w = 250 + Math.random() * 150; // Platformlar daha geniş ve güvenli
+        let y = Math.max(300, Math.min(canvas.height - 200, last.y + yGap));
+        const w = 300 + Math.random() * 100;
 
-        platforms.push({ x, y, w, h: 25 });
-        if(Math.random() > 0.3) gifts.push({ x: x + w/2 - 20, y: y - 70, active: true });
+        platforms.push({ x, y, w, h: 30 });
+        if(Math.random() > 0.3) gifts.push({ x: x + w/2 - 20, y: y - 80, active: true });
     }
 
     function update() {
-        // Kontroller - Havada hareket kabiliyeti artırıldı
-        let moveSpeed = santa.grounded ? 10 : 12;
-        if (keys.left) santa.vx = -moveSpeed;
-        else if (keys.right) santa.vx = moveSpeed;
-        else santa.vx *= 0.85;
+        // Hareket ve Havada Süzülme
+        if (keys.left) santa.vx = -12;
+        else if (keys.right) santa.vx = 12;
+        else santa.vx *= 0.9;
 
-        // Zıplama
         if (keys.up && santa.grounded) {
             santa.vy = santa.jumpForce;
             santa.grounded = false;
         }
 
-        // Fizik (Gravity düşürüldü: 0.8)
-        santa.vy += 0.8; 
+        // Yerçekimi azaltıldı (0.7), daha yumuşak düşüş
+        santa.vy += 0.7; 
         santa.x += santa.vx;
         santa.y += santa.vy;
         
         santa.grounded = false;
 
-        // Platform Çarpışması
         platforms.forEach(p => {
             if (santa.vy >= 0 && 
-                santa.x + 30 < p.x + p.w && 
-                santa.x + santa.w - 30 > p.x && 
+                santa.x + 20 < p.x + p.w && 
+                santa.x + santa.w - 20 > p.x && 
                 santa.y + santa.h > p.y && 
-                santa.y + santa.h < p.y + p.h + santa.vy + 5) {
+                santa.y + santa.h < p.y + p.h + santa.vy + 10) {
                 
                 santa.grounded = true;
                 santa.vy = 0;
@@ -155,20 +172,18 @@
             }
         });
 
-        // Hediye Toplama
         gifts.forEach(g => {
-            if (g.active && Math.abs(santa.x - g.x) < 70 && Math.abs(santa.y - g.y) < 100) {
+            if (g.active && Math.abs(santa.x - g.x) < 80 && Math.abs(santa.y - g.y) < 120) {
                 g.active = false;
                 score++;
                 if (platforms.length < score + 20) spawnPlatform();
             }
         });
 
-        // Reset
         if (santa.y > canvas.height + 200) {
-            const restartPoint = platforms.find(p => p.x > santa.x - 400) || platforms[0];
-            santa.x = restartPoint.x + 50;
-            santa.y = restartPoint.y - 300;
+            const restart = platforms.find(p => p.x > santa.x - 500) || platforms[0];
+            santa.x = restart.x + 50;
+            santa.y = restart.y - 400;
             santa.vy = 0;
         }
 
@@ -177,36 +192,31 @@
     }
 
     function draw() {
-        ctx.fillStyle = "#000000"; // Tam şeffaf görünüm için siyah
+        ctx.fillStyle = "#000";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Kamera Noel Baba'yı takip ederken daha yumuşak
-        const camX = -santa.x + 300;
+        const camX = -santa.x + 200;
         ctx.save();
         ctx.translate(camX, 0);
 
-        // Platformlar - Parlak Neon
         platforms.forEach(p => {
-            ctx.fillStyle = "#00ffcc"; 
+            ctx.fillStyle = "#0ff"; 
             ctx.fillRect(p.x, p.y, p.w, p.h);
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(p.x, p.y, p.w, 6); // Üstteki kar çizgisi
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(p.x, p.y, p.w, 8); 
         });
 
-        // Hediyeler
-        ctx.font = "60px Arial";
+        ctx.font = "70px Arial";
         gifts.forEach(g => { if(g.active) ctx.fillText("🎁", g.x, g.y); });
         
-        // Noel Baba
-        ctx.font = "100px Arial"; 
-        ctx.fillText("🎅", santa.x, santa.y + 85);
+        ctx.font = "120px Arial"; 
+        ctx.fillText("🎅", santa.x, santa.y + 100);
         
         ctx.restore();
 
-        // Skor
         ctx.fillStyle = "#fff";
-        ctx.font = "bold 35px Arial";
-        ctx.fillText("HEDİYELER: " + score, 40, 70);
+        ctx.font = "bold 40px Arial";
+        ctx.fillText("HEDİYE: " + score, 40, 80);
     }
 </script>
 </body>
