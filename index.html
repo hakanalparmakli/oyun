@@ -7,32 +7,64 @@
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        body { margin: 0; background: #000; color: #fff; overflow: hidden; font-family: 'Arial Rounded MT Bold', sans-serif; }
+        body { margin: 0; background: #000; color: #fff; overflow: hidden; font-family: Arial, sans-serif; touch-action: manipulation; }
         canvas { display: block; }
         #setup-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             background: radial-gradient(circle at center, #112 0%, #000 70%); z-index: 10;
-            color: #0ff;
-            text-shadow: 0 0 20px #0ff;
+            color: #0ff; text-shadow: 0 0 20px #0ff;
         }
         #qrcode { padding: 20px; background: rgba(255,255,255,0.9); border-radius: 20px; box-shadow: 0 0 30px #0ff; }
-        #status { font-size: 2.5em; margin-top: 20px; text-shadow: 0 0 15px #0ff; }
-        #player-list { font-size: 1.5em; margin: 20px; text-align: center; }
-        #countdown { font-size: 5em; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20; display: none; }
+        #status { font-size: 2.5em; margin: 20px; }
+        #player-list { font-size: 1.8em; margin: 20px; }
+        #start-btn { font-size: 2em; padding: 15px 30px; background: #0ff; color: #000; border: none; border-radius: 15px; margin-top: 30px; cursor: pointer; box-shadow: 0 0 20px #0ff; }
+
+        /* Mobil Kumanda (sadece telefonlarda görünür) */
+        #mobile-controls {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 200px;
+            background: linear-gradient(transparent, #000);
+            display: none; /* Sadece client tarafında gösterilecek */
+            justify-content: space-between; align-items: flex-end;
+            padding: 20px; box-sizing: border-box; z-index: 5;
+        }
+        .control-btn {
+            width: 100px; height: 100px; background: rgba(0,255,255,0.3);
+            border: 4px solid #0ff; border-radius: 50%; color: #0ff;
+            font-size: 3em; display: flex; align-items: center; justify-content: center;
+            user-select: none; touch-action: manipulation;
+            box-shadow: 0 0 20px #0ff;
+        }
+        #jump-btn { position: fixed; bottom: 50px; right: 30px; width: 120px; height: 120px; font-size: 4em; }
+
+        #countdown {
+            font-size: 8em; position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); z-index: 20; display: none;
+            text-shadow: 0 0 30px #0ff; color: #0ff;
+        }
     </style>
 </head>
 <body>
 
     <canvas id="gameCanvas"></canvas>
 
+    <!-- Host ekranı -->
     <div id="setup-screen">
         <div id="qrcode"></div>
         <div id="status">Bağlantı kuruluyor...</div>
-        <div id="player-list"></div>
+        <div id="player-list">Bağlananlar: 1 kişi (sen)</div>
+        <button id="start-btn">OYUNU BAŞLAT</button>
     </div>
 
+    <!-- Geri sayım -->
     <div id="countdown"></div>
+
+    <!-- Mobil kumanda (sadece telefonlarda görünür) -->
+    <div id="mobile-controls">
+        <div class="control-btn" id="left-btn">◄</div>
+        <div class="control-btn" id="right-btn">►</div>
+        <div class="control-btn" id="jump-btn">▲</div>
+    </div>
 
 <script>
     const canvas = document.getElementById('gameCanvas');
@@ -40,123 +72,34 @@
     const statusText = document.getElementById('status');
     const playerList = document.getElementById('player-list');
     const countdownEl = document.getElementById('countdown');
+    const setupScreen = document.getElementById('setup-screen');
+    const mobileControls = document.getElementById('mobile-controls');
+    const startBtn = document.getElementById('start-btn');
 
-    // *** SERVERLESS ÇALIŞMASI İÇİN DEĞİŞTİRİLEN KISIM ***
+    // Serversiz PeerJS
     const peer = new Peer(undefined, {
         host: '0.peerjs.com',
         secure: true,
         port: 443
-        // Path belirtmeye gerek yok, resmi server otomatik doğru yolu kullanıyor
     });
 
     let connections = [];
     let players = [];
     const maxPlayers = 10;
     let gameStarted = false;
-    let startTime;
-    let endTime;
-    let checkpoints = [];
+    let countdownActive = false;
 
     const urlParams = new URLSearchParams(window.location.search);
     const peerIdParam = urlParams.get('peer');
 
-    // Hata takibi
+    let myInput = { left: false, right: false, jump: false };
+    let conn; // Client tarafı için
+
     peer.on('error', (err) => {
         console.error('PeerJS Hatası:', err);
         statusText.innerText = "Bağlantı Hatası: " + err.type;
     });
 
-    peer.on('disconnected', () => {
-        console.log('Bağlantı koptu, yeniden bağlanıyor...');
-        peer.reconnect();
-    });
-
-    if (!peerIdParam) {
-        // Host tarafı
-        peer.on('open', (id) => {
-            console.log('Peer ID alındı:', id);
-            new QRCode(document.getElementById("qrcode"), {
-                text: window.location.origin + window.location.pathname + "?peer=" + id,
-                width: 280, height: 280, colorDark: "#0ff", colorLight: "#fff"
-            });
-            statusText.innerText = "Oyuncular Bekleniyor (0/" + maxPlayers + ")";
-            updatePlayerList();
-        });
-
-        peer.on('connection', (conn) => {
-            if (connections.length >= maxPlayers) {
-                conn.on('open', () => {
-                    conn.send({ type: 'full' });
-                    conn.close();
-                });
-                return;
-            }
-
-            connections.push(conn);
-            const playerId = connections.length;
-
-            conn.on('open', () => {
-                console.log('Yeni oyuncu bağlandı:', playerId);
-                conn.send({ type: 'id', id: playerId });
-                updatePlayerList();
-            });
-
-            conn.on('data', (data) => {
-                if (data.type === 'input') {
-                    if (players[playerId]) {
-                        players[playerId].left = data.left;
-                        players[playerId].right = data.right;
-                        players[playerId].jump = data.jump;
-                    }
-                }
-            });
-
-            conn.on('close', () => {
-                console.log('Oyuncu ayrıldı:', playerId);
-                connections.splice(connections.indexOf(conn), 1);
-                delete players[playerId];
-                updatePlayerList();
-            });
-        });
-
-    } else {
-        // Client (mobil) tarafı
-        peer.on('open', () => {
-            const conn = peer.connect(peerIdParam);
-            
-            conn.on('open', () => {
-                statusText.innerText = "Bağlandı! Kontroller aktif.";
-                document.getElementById('setup-screen').style.display = 'none';
-                // Burada mobil kontrolleri gösterebilirsin
-            });
-
-            conn.on('data', (data) => {
-                if (data.type === 'id') {
-                    // ID alındı, oyun başlayabilir
-                } else if (data.type === 'full') {
-                    statusText.innerText = "Oyun dolu!";
-                }
-            });
-
-            // Mobil kontrollerden gelen input'ları gönder
-            // (Senin önceki kodunda varsa buraya ekle)
-        });
-    }
-
-    function updatePlayerList() {
-        const count = connections.length + 1; // +1 host için
-        statusText.innerText = `Oyuncular Bekleniyor (\( {count}/ \){maxPlayers})`;
-        playerList.innerText = `Bağlananlar: ${count} kişi`;
-        
-        if (count >= 2 && !gameStarted) {
-            // Otomatik başlatma vs. ekleyebilirsin
-        }
-    }
-
-    // Geri kalan oyun mantığın (initGame, update, draw vs.) buraya gelecek
-    // (Önceki tam kodunda ne varsa aynı şekilde devam et)
-
-    // Canvas boyutlandırma
     function resizeCanvas() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -164,6 +107,146 @@
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
+    function updatePlayerList() {
+        const count = connections.length + 1; // +1 host
+        playerList.innerText = `Bağlananlar: ${count} kişi`;
+        if (!gameStarted) {
+            statusText.innerText = `Oyuncular Bekleniyor (\( {count}/ \){maxPlayers})`;
+        }
+    }
+
+    // Geri sayım fonksiyonu
+    function startCountdown() {
+        if (countdownActive) return;
+        countdownActive = true;
+        setupScreen.style.display = 'none';
+        mobileControls.style.display = 'none';
+
+        let count = 3;
+        countdownEl.style.display = 'block';
+        countdownEl.innerText = count;
+
+        const interval = setInterval(() => {
+            count--;
+            if (count > 0) {
+                countdownEl.innerText = count;
+            } else {
+                countdownEl.innerText = "BAŞLA!";
+                setTimeout(() => {
+                    countdownEl.style.display = 'none';
+                    gameStarted = true;
+                    // BURAYA OYUN BAŞLAMA KODUNU EKLE (animasyon loop vs.)
+                    console.log("Oyun başladı!");
+                    gameLoop();
+                }, 800);
+                clearInterval(interval);
+            }
+        }, 1000);
+    }
+
+    function gameLoop() {
+        // BURAYA ASIL OYUN ÇİZİM VE GÜNCELLEME KODUNU YAZACAKSIN
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#0ff';
+        ctx.font = '50px Arial';
+        ctx.fillText('OYUN ÇALIŞIYOR!', 100, 100);
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    if (!peerIdParam) {
+        // ============= HOST TARAFI =============
+        peer.on('open', (id) => {
+            console.log('Host ID:', id);
+            new QRCode(document.getElementById("qrcode"), {
+                text: window.location.origin + window.location.pathname + "?peer=" + id,
+                width: 280, height: 280, colorDark: "#0ff", colorLight: "#fff"
+            });
+            updatePlayerList();
+        });
+
+        peer.on('connection', (c) => {
+            if (connections.length >= maxPlayers - 1 || gameStarted) {
+                c.on('open', () => { c.send({ type: 'full' }); c.close(); });
+                return;
+            }
+
+            connections.push(c);
+            const playerId = connections.length; // 1'den başlar
+
+            c.on('open', () => {
+                c.send({ type: 'welcome', id: playerId });
+                updatePlayerList();
+            });
+
+            c.on('data', (data) => {
+                if (data.type === 'input' && players[playerId]) {
+                    players[playerId].left = data.left;
+                    players[playerId].right = data.right;
+                    players[playerId].jump = data.jump;
+                }
+            });
+
+            c.on('close', () => {
+                connections = connections.filter(x => x !== c);
+                updatePlayerList();
+            });
+        });
+
+        // Başlat butonu (10 saniye otomatik bekleme de var ama manuel de başlatabilir)
+        startBtn.onclick = () => {
+            startBtn.disabled = true;
+            startBtn.innerText = "Başlıyor...";
+            setTimeout(startCountdown, 10000); // 10 saniye bekle
+            statusText.innerText = "10 saniye içinde başlıyor...";
+        };
+
+    } else {
+        // ============= CLIENT (TELEFON) TARAFI =============
+        setupScreen.style.display = 'flex';
+        statusText.innerText = "Host'a bağlanıyor...";
+        document.getElementById('qrcode').style.display = 'none';
+        startBtn.style.display = 'none';
+
+        peer.on('open', () => {
+            conn = peer.connect(peerIdParam);
+
+            conn.on('open', () => {
+                statusText.innerText = "Bağlandı! Kumandayı kullan";
+                setupScreen.style.display = 'none';
+                mobileControls.style.display = 'flex'; // Kumanda göründü!
+            });
+
+            conn.on('data', (data) => {
+                if (data.type === 'full') {
+                    statusText.innerText = "Oyun dolu!";
+                }
+            });
+        });
+
+        // Mobil buton kontrolleri
+        const sendInput = () => {
+            if (conn && conn.open) {
+                conn.send({ type: 'input', left: myInput.left, right: myInput.right, jump: myInput.jump });
+            }
+        };
+
+        document.getElementById('left-btn').addEventListener('touchstart', (e) => { e.preventDefault(); myInput.left = true; sendInput(); });
+        document.getElementById('left-btn').addEventListener('touchend', () => { myInput.left = false; sendInput(); });
+
+        document.getElementById('right-btn').addEventListener('touchstart', (e) => { e.preventDefault(); myInput.right = true; sendInput(); });
+        document.getElementById('right-btn').addEventListener('touchend', () => { myInput.right = false; sendInput(); });
+
+        document.getElementById('jump-btn').addEventListener('touchstart', (e) => { e.preventDefault(); myInput.jump = true; sendInput(); });
+        document.getElementById('jump-btn').addEventListener('touchend', () => { myInput.jump = false; sendInput(); });
+
+        // Mouse desteği de ekledim (test için bilgisayarda da kullanabilesin)
+        document.getElementById('left-btn').addEventListener('mousedown', () => { myInput.left = true; sendInput(); });
+        document.getElementById('left-btn').addEventListener('mouseup', () => { myInput.left = false; sendInput(); });
+        // right ve jump için de aynı
+    }
+
+    updatePlayerList();
 </script>
 </body>
 </html>
