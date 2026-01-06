@@ -64,8 +64,11 @@ if(!peerParam){
  peer.on("open",id=>{
    const qrEl=document.getElementById("qrcode");
    qrEl.innerHTML=""; // Temizle
-   new QRCode(qrEl,{text:location.href+"?peer="+id,width:240,height:240}); // QR oluştur
-   console.log("QR oluşturuldu:",id);
+   // URL'i düzgün oluştur
+   let url = new URL(location.href);
+   url.searchParams.set("peer", id);
+   new QRCode(qrEl, { text: url.toString(), width:240, height:240 });
+   console.log("QR oluşturuldu:", id);
    setTimeout(startCountdown,20000);
  });
 
@@ -130,7 +133,7 @@ else{
        if(peer.id===d.activePeerId) lockEl.style.display="none";
        else lockEl.style.display="flex";
      } 
-     if(d.type==="key") keys[d.key]=d.pressed;
+     if(d.type==="key") keys[d.key]=d.keyPressed;
    });
 
    const bind=(id,key)=>{
@@ -158,7 +161,7 @@ function spawnPlatform(){
  const xGap=50+Math.random()*50;
  const yGap=(Math.random()-0.5)*80;
  const x=last.x+last.w+xGap;
- const y=Math.max(250,Math.min(canvas.height-180,last.y+yGap));
+ const y=Math.max(250, Math.min(canvas.height-180,last.y+yGap));
  const w=200+Math.random()*200;
  platforms.push({x,y,w,h:30});
  if(Math.random()>0.4) gifts.push({x:x+w/2,y:y-80,active:true});
