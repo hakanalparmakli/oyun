@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Garantili Noel Baba - Sırasız Oyuncular</title>
+<title>Alparmaklı Ailesi Oyunu</title>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -40,6 +40,11 @@ canvas{display:block}
  margin:auto
 }
 .jump{background:rgba(255,0,0,.3);font-size:70px}
+#lock{
+ position:absolute;inset:0;display:flex;justify-content:center;align-items:center;
+ background:rgba(0,0,0,.7);font-size:50px;color:#fff;z-index:5;
+ display:none;
+}
 input,button{font-size:25px;padding:10px;margin:10px}
 </style>
 </head>
@@ -47,6 +52,7 @@ input,button{font-size:25px;padding:10px;margin:10px}
 <body>
 
 <div id="setup">
+ <h1>Alparmaklı Ailesi Oyunu</h1>
  <div id="qrcode"></div>
  <div id="playerCount">Oyuncular: 0</div>
  <div id="order"></div>
@@ -56,12 +62,14 @@ input,button{font-size:25px;padding:10px;margin:10px}
 <div id="overlay" style="display:none"></div>
 
 <div id="nameScreen" style="display:none">
- <h1>İsmini Gir</h1>
+ <h1>Alparmaklı Ailesi Oyunu</h1>
+ <h2>İsmini Gir</h2>
  <input id="playerName">
  <button id="joinBtn">KATIL</button>
 </div>
 
 <div id="mobile">
+ <div id="lock">Sıranı Bekle</div>
  <div class="pad">
   <div id="left" class="btn">◀</div>
   <div id="jump" class="btn jump">ZIPLA</div>
@@ -82,7 +90,8 @@ const params=new URLSearchParams(location.search);
 const peerId=params.get("peer");
 
 let players=[],currentIndex=0,activePeer=null,keys={left:false,right:false,up:false};
-let gameActive=false,santa,platforms=[],finishX=3500;
+let gameActive=false,santa,platforms=[],finishX=5000,checkpoints=[];
+let lastCheckpointX=0;
 
 /* ================= HOST ================= */
 if(!peerId){
@@ -111,7 +120,7 @@ function renderOrder(){
  order.innerHTML="<h2>Oyun Sırası</h2>"+players.map((p,i)=>`${i+1}. ${p.name}`).join("<br>");
 }
 
-// Gizli bekleme: 20 saniye, kullanıcı görmez
+// Gizli bekleme: 20 saniye
 function waitAndStart(){
  gameActive=true;
  let hiddenWait=20;
@@ -135,15 +144,17 @@ function startCountdown3(){
      clearInterval(i);
      countdown.style.display="none";
      overlay.style.display="none";
-     setup.style.display="none"; // QR ekranı gizlendi
+     setup.style.display="none";
      startTurn();
    }
  },1000);
 }
 
 function startTurn(){
+ document.querySelectorAll("#mobile #lock").forEach(l=>l.style.display="flex");
+
  if(currentIndex>=players.length){
-  overlay.innerHTML="<h1>Oyun Bitti!</h1>"+players
+  overlay.innerHTML="<h1>Alparmaklı Ailesi Oyunu - Oyun Bitti!</h1>"+players
    .sort((a,b)=>b.score-a.score)
    .map((p,i)=>`${i+1}. ${p.name} - ${p.score}`).join("<br>");
   overlay.style.display="flex";
@@ -156,6 +167,9 @@ function startTurn(){
 
  setTimeout(()=>{
   overlay.style.display="none";
+  document.querySelectorAll("#mobile #lock").forEach(l=>{
+   if(l.parentNode){l.style.display=(peer.id===activePeer)?"none":"flex";}
+  });
   initGame();
  },1500);
 }
@@ -164,12 +178,19 @@ function startTurn(){
 function initGame(){
  santa={x:50,y:200,w:80,h:90,vx:0,vy:0,ground:false};
  platforms=[{x:0,y:canvas.height-120,w:600,h:30}];
- let x=600;
+ let x=600; let count=0;
+ checkpoints=[];
+ lastCheckpointX=0;
+
  while(x<finishX){
   let gap=220+Math.random()*120;
   let w=260;
   let y=canvas.height-200+(Math.random()-0.5)*120;
   platforms.push({x,y,w,h:30});
+  count++;
+  if(count%10===0){
+   checkpoints.push({x:x+w/2});
+  }
   x+=w+gap;
  }
  requestAnimationFrame(loop);
@@ -199,9 +220,23 @@ function loop(){
   }
  });
 
+ checkpoints.forEach(c=>{
+  if(santa.x>c.x) lastCheckpointX=c.x;
+ });
+
+ if(santa.y>canvas.height+200){
+  santa.x=lastCheckpointX||50;
+  santa.y=200;
+  santa.vy=0;
+ }
+
  ctx.save();
  ctx.translate(-santa.x+150,0);
+
  platforms.forEach(p=>{ ctx.fillStyle="#0ff"; ctx.fillRect(p.x,p.y,p.w,p.h); });
+ checkpoints.forEach(c=>{ ctx.fillStyle="yellow"; ctx.fillRect(c.x-10,canvas.height-200,20,100); });
+ ctx.fillStyle="red"; ctx.fillRect(finishX,0,10,canvas.height);
+
  ctx.font="120px Arial";
  ctx.fillText("🎅",santa.x,santa.y+100);
  ctx.restore();
@@ -239,8 +274,18 @@ peer.on("open",()=>{
  ["left","right","up"].forEach((k,i)=>{
   const id=i==0?"left":i==1?"right":"jump";
   const el=document.getElementById(id);
-  el.addEventListener("touchstart",e=>{e.preventDefault();conn.send({key:k,pressed:true,type:"key"});},{passive:false});
-  el.addEventListener("touchend",e=>{e.preventDefault();conn.send({key:k,pressed:false,type:"key"});},{passive:false});
+  el.addEventListener("touchstart",e=>{
+   e.preventDefault();
+   if(document.getElementById("lock").style.display==="none"){
+     conn.send({key:k,pressed:true,type:"key"});
+   }
+  },{passive:false});
+  el.addEventListener("touchend",e=>{
+   e.preventDefault();
+   if(document.getElementById("lock").style.display==="none"){
+     conn.send({key:k,pressed:false,type:"key"});
+   }
+  },{passive:false});
  });
 });
 }
