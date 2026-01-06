@@ -23,22 +23,18 @@ canvas{display:block;}
 </head>
 <body>
 
-<!-- HOST -->
 <div id="host" class="screen">
  <div id="qrcode"></div>
  <div id="order"></div>
 </div>
 
-<!-- Countdown -->
 <div id="countdown" class="screen"></div>
 
-<!-- MOBILE NAME -->
 <div id="name" class="screen" style="display:none">
  <input id="playerName" placeholder="Adınız">
  <button id="join">KATIL</button>
 </div>
 
-<!-- MOBILE CONTROLLER -->
 <div id="mobile">
  <div id="lock">Sıranı Bekle</div>
  <div class="pad">
@@ -51,6 +47,7 @@ canvas{display:block;}
 <canvas id="gameCanvas"></canvas>
 
 <script>
+window.onload = function() {
 const canvas=document.getElementById("gameCanvas");
 const ctx=canvas.getContext("2d");
 const params=new URLSearchParams(location.search);
@@ -58,54 +55,57 @@ const peerParam=params.get("peer");
 const peer=new Peer();
 let connections=[],players=[],activePeerId=null,gameStarted=false,keys={left:false,right:false,up:false};
 
-/* ------------------ HOST ------------------ */
+/* HOST */
 if(!peerParam){
  const hostEl=document.getElementById("host");
  const orderEl=document.getElementById("order");
  const countdownEl=document.getElementById("countdown");
 
  peer.on("open",id=>{
-  new QRCode(document.getElementById("qrcode"),{text:location.href+"?peer="+id,width:240,height:240});
-  console.log("QR oluşturuldu:",id);
-  setTimeout(startCountdown,20000); // 20 saniye bekleme
+   const qrEl=document.getElementById("qrcode");
+   qrEl.innerHTML="";
+   new QRCode(qrEl,{text:location.href+"?peer="+id,width:240,height:240});
+   console.log("QR oluşturuldu:",id);
+   setTimeout(startCountdown,20000);
  });
 
  peer.on("connection",c=>{
-  connections.push(c);
-  c.on("data",d=>{
-   if(d.type==="join"){
-    players.push({id:c.peer,name:d.name});
-    renderOrder();
-   }
-  });
+   connections.push(c);
+   c.on("data",d=>{
+     if(d.type==="join"){
+       players.push({id:c.peer,name:d.name});
+       renderOrder();
+     }
+   });
  });
 
  function shuffle(arr){for(let i=arr.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}}
 
  function renderOrder(){
-  shuffle(players);
-  orderEl.innerHTML="<b>Oyun Sırası</b><br><br>"+players.map((p,i)=>`${i+1}. ${p.name}${i===0?" (BAŞLIYOR)":""}`).join("<br>");
-  activePeerId=players[0]?.id||null;
+   shuffle(players);
+   orderEl.innerHTML="<b>Oyun Sırası</b><br><br>"+players.map((p,i)=>`${i+1}. ${p.name}${i===0?" (BAŞLIYOR)":""}`).join("<br>");
+   activePeerId=players[0]?.id||null;
  }
 
  function startCountdown(){
-  hostEl.style.display="none";
-  countdownEl.style.display="flex";
-  let n=3; countdownEl.innerText=n;
-  const interval=setInterval(()=>{
-   n--; if(n>0) countdownEl.innerText=n;
-   else{ clearInterval(interval); countdownEl.style.display="none"; startGame(); }
-  },1000);
+   hostEl.style.display="none";
+   countdownEl.style.display="flex";
+   let n=3; countdownEl.innerText=n;
+   const interval=setInterval(()=>{
+     n--;
+     if(n>0) countdownEl.innerText=n;
+     else{ clearInterval(interval); countdownEl.style.display="none"; startGame(); }
+   },1000);
  }
 
  function startGame(){
-  gameStarted=true;
-  connections.forEach(c=>c.send({type:"start",activePeerId}));
-  initGame();
+   gameStarted=true;
+   connections.forEach(c=>c.send({type:"start",activePeerId}));
+   initGame();
  }
 }
 
-/* ------------------ MOBILE ------------------ */
+/* MOBILE */
 else{
  const nameEl=document.getElementById("name");
  const mobileEl=document.getElementById("mobile");
@@ -114,36 +114,36 @@ else{
  const playerInput=document.getElementById("playerName");
 
  peer.on("open",()=>{
-  const conn=peer.connect(peerParam);
-  nameEl.style.display="flex";
+   const conn=peer.connect(peerParam);
+   nameEl.style.display="flex";
 
-  joinBtn.onclick=()=>{
-   const val=playerInput.value.trim();
-   if(!val) return alert("İsim gir");
-   conn.send({type:"join",name:val});
-   nameEl.style.display="none";
-   mobileEl.style.display="block";
-  };
+   joinBtn.onclick=()=>{
+     const val=playerInput.value.trim();
+     if(!val) return alert("İsim gir");
+     conn.send({type:"join",name:val});
+     nameEl.style.display="none";
+     mobileEl.style.display="block";
+   };
 
-  conn.on("data",d=>{
-   if(d.type==="start"){
-    if(peer.id===d.activePeerId) lockEl.style.display="none";
-    else lockEl.style.display="flex";
-   } 
-   if(d.type==="key") keys[d.key]=d.pressed;
-  });
+   conn.on("data",d=>{
+     if(d.type==="start"){
+       if(peer.id===d.activePeerId) lockEl.style.display="none";
+       else lockEl.style.display="flex";
+     } 
+     if(d.type==="key") keys[d.key]=d.pressed;
+   });
 
-  const bind=(id,key)=>{
-   const el=document.getElementById(id);
-   let pressed=false;
-   el.addEventListener("touchstart",e=>{e.preventDefault();if(!pressed){pressed=true;conn.send({type:"key",key,keyPressed:true})}},{passive:false});
-   el.addEventListener("touchend",e=>{e.preventDefault();pressed=false;conn.send({type:"key",key,keyPressed:false})},{passive:false});
-  };
+   const bind=(id,key)=>{
+     const el=document.getElementById(id);
+     let pressed=false;
+     el.addEventListener("touchstart",e=>{e.preventDefault();if(!pressed){pressed=true;conn.send({type:"key",key,keyPressed:true})}},{passive:false});
+     el.addEventListener("touchend",e=>{e.preventDefault();pressed=false;conn.send({type:"key",key,keyPressed:false})},{passive:false});
+   };
 
-  bind("left","left"); bind("right","right"); bind("jump","up");
+   bind("left","left"); bind("right","right"); bind("up","up");
 }
 
-/* ------------------ OYUN ------------------ */
+/* OYUN */
 function initGame(){
  canvas.width=window.innerWidth; canvas.height=window.innerHeight;
  window.santa={x:100,y:canvas.height-400,w:80,h:90,vx:0,vy:0,jumpForce:-20,grounded:false};
@@ -198,6 +198,7 @@ function draw(){
  ctx.restore();
  ctx.fillStyle="#fff";ctx.font="bold 40px Arial";ctx.fillText("SKOR: "+score,40,80);
 }
+};
 </script>
 </body>
 </html>
