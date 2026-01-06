@@ -11,7 +11,6 @@
 <style>
 body{margin:0;background:#000;color:#fff;font-family:Arial;overflow:hidden;height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;}
 .screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-#title{font-size:36px;margin-bottom:20px;text-align:center}
 #qrcode{background:#fff;padding:15px;border-radius:10px}
 #order{margin-top:20px;font-size:22px;text-align:center}
 #countdown{font-size:160px;font-weight:bold;display:none}
@@ -30,7 +29,6 @@ body{margin:0;background:#000;color:#fff;font-family:Arial;overflow:hidden;heigh
 
 <!-- HOST -->
 <div id="host" class="screen">
- <div id="title">Alparmaklı Ailesi Oyunu</div>
  <div id="qrcode"></div>
  <div id="order"></div>
 </div>
@@ -40,7 +38,6 @@ body{margin:0;background:#000;color:#fff;font-family:Arial;overflow:hidden;heigh
 
 <!-- MOBILE NAME -->
 <div id="name" class="screen" style="display:none">
- <h1>İsmini Gir</h1>
  <input id="playerName" placeholder="Adınız">
  <button id="join">KATIL</button>
 </div>
@@ -73,7 +70,7 @@ if(!peerParam){
   new QRCode(qrEl,{text:location.href+"?peer="+id,width:240,height:240});
   console.log("QR oluşturuldu, Peer ID:",id);
 
-  // 20 saniye bekleme (ekranda yazmaz)
+  // 20 saniye bekleme (ekranda görünmez)
   setTimeout(startCountdown,20000);
  });
 
@@ -131,7 +128,6 @@ else{
  const joinBtn=document.getElementById("join");
  const playerInput=document.getElementById("playerName");
 
- // Önce peer açılmasını bekle
  peer.on("open",()=>{
   const conn=peer.connect(peerParam);
 
