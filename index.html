@@ -165,8 +165,10 @@ function startTurn(){
 
  setTimeout(()=>{
   overlay.style.display="none";
+  // Kilidi güncelle
   document.querySelectorAll("#mobile #lock").forEach(l=>{
-   if(l.parentNode){l.style.display=(peer.id===activePeer)?"none":"flex";}
+   if(peer.id===activePeer) l.style.display="none";
+   else l.style.display="flex";
   });
   initGame();
  },1500);
@@ -176,8 +178,8 @@ function startTurn(){
 function initGame(){
  santa={x:50,y:200,w:80,h:90,vx:0,vy:0,ground:false};
  platforms=[{x:0,y:canvas.height-120,w:600,h:30}];
- let x=600; let count=0;
- checkpoints=[];
+ let x=600; let count=1; // ilk platform checkpoint
+ checkpoints=[{x:300}]; // ilk checkpoint
  lastCheckpointX=0;
 
  while(x<finishX){
@@ -233,7 +235,7 @@ function loop(){
  ctx.translate(-santa.x+150,0);
 
  platforms.forEach(p=>{ ctx.fillStyle="#0ff"; ctx.fillRect(p.x,p.y,p.w,p.h); });
- checkpoints.forEach(c=>{ ctx.fillStyle="yellow"; ctx.fillRect(c.x-10,canvas.height-200,20,100); });
+ checkpoints.forEach(c=>{ ctx.fillStyle="green"; ctx.fillRect(c.x-10,canvas.height-200,20,100); });
  ctx.fillStyle="red"; ctx.fillRect(finishX,0,10,canvas.height);
 
  ctx.font="120px Arial";
@@ -265,10 +267,16 @@ peer.on("open",()=>{
   conn.send({type:"join",name});
   nameScreen.style.display="none";
   mobile.style.display="block";
+  updateLock(); // kilidi ilk aç
  };
 
  joinBtn.addEventListener("click",sendJoin);
  joinBtn.addEventListener("touchstart",e=>{ e.preventDefault(); sendJoin(); },{passive:false});
+
+ function updateLock(){
+  const lock=document.getElementById("lock");
+  lock.style.display=(peer.id===activePeer)?"none":"flex";
+ }
 
  ["left","right","up"].forEach((k,i)=>{
   const id=i==0?"left":i==1?"right":"jump";
