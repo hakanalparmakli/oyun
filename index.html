@@ -63,8 +63,8 @@ if(!peerParam){
 
  peer.on("open",id=>{
    const qrEl=document.getElementById("qrcode");
-   qrEl.innerHTML=""; // Temizle
-   // URL'i düzgün oluştur
+   qrEl.innerHTML=""; 
+   // GitHub Pages linkini düzgün oluştur
    let url = new URL(location.href);
    url.searchParams.set("peer", id);
    new QRCode(qrEl, { text: url.toString(), width:240, height:240 });
