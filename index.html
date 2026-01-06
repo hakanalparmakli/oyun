@@ -43,7 +43,7 @@ canvas{display:block}
 #lock{
  position:absolute;inset:0;display:flex;justify-content:center;align-items:center;
  background:rgba(0,0,0,.7);font-size:50px;color:#fff;z-index:5;
- display:none;
+ display:flex;
 }
 input,button{font-size:25px;padding:10px;margin:10px}
 </style>
@@ -81,7 +81,6 @@ input,button{font-size:25px;padding:10px;margin:10px}
 
 <script>
 document.addEventListener("contextmenu",e=>e.preventDefault());
-
 const canvas=c,ctx=canvas.getContext("2d");
 canvas.width=innerWidth; canvas.height=innerHeight;
 
@@ -90,8 +89,7 @@ const params=new URLSearchParams(location.search);
 const peerId=params.get("peer");
 
 let players=[],currentIndex=0,activePeer=null,keys={left:false,right:false,up:false};
-let gameActive=false,santa,platforms=[],finishX=5000,checkpoints=[];
-let lastCheckpointX=0;
+let gameActive=false,santa,platforms=[],finishX=5000,checkpoints=[],lastCheckpointX=0;
 
 /* ================= HOST ================= */
 if(!peerId){
@@ -220,6 +218,7 @@ function loop(){
   }
  });
 
+ // Checkpoint geçişi
  checkpoints.forEach(c=>{
   if(santa.x>c.x) lastCheckpointX=c.x;
  });
