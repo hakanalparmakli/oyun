@@ -88,7 +88,7 @@ const params=new URLSearchParams(location.search);
 const peerId=params.get("peer");
 
 let players=[],currentIndex=0,activePeer=null,keys={left:false,right:false,up:false};
-let gameActive=false,santa,platforms=[],finishX=5000,checkpoints=[],lastCheckpointX=0;
+let gameActive=false,santa,platforms=[],finishX=15000,checkpoints=[],lastCheckpointX=0;
 
 /* ================= HOST ================= */
 if(!peerId){
@@ -102,7 +102,7 @@ peer.on("open",id=>{
 peer.on("connection",c=>{
  c.on("data",d=>{
   if(d.type==="join"){
-   players.push({peer:c.peer,name:d.name,score:0});
+   players.push({peer:c.peer,name:d.name,score:0,falls:0});
    playerCount.innerText=`Oyuncular: ${players.length}`;
    renderOrder();
    if(!gameActive) waitAndStart();
@@ -149,14 +149,19 @@ function startCountdown3(){
 
 function startTurn(){
  if(currentIndex>=players.length){
-  overlay.innerHTML="<h1>Alparmaklı Ailesi Oyunu - Oyun Bitti!</h1>"+players
-   .sort((a,b)=>b.score-a.score)
-   .map((p,i)=>`${i+1}. ${p.name} - ${p.score}`).join("<br>");
+  // Sıralama: süre -> düşme -> süre tekrar
+  const sorted = players.slice().sort((a,b)=>{
+   if(a.time !== b.time) return a.time - b.time;
+   return a.falls - b.falls;
+  });
+
+  overlay.innerHTML = "<h1>Alparmaklı Ailesi Oyunu - Oyun Bitti!</h1>" +
+   sorted.map((p,i)=>`${i+1}. ${p.name} - ${p.time.toFixed(2)}s, Düşme: ${p.falls}`).join("<br>");
   overlay.style.display="flex";
   return;
  }
- const p=players[currentIndex];
- activePeer=p.peer;
+ const p = players[currentIndex];
+ activePeer = p.peer;
  overlay.innerHTML=`<h1>Şimdi Oynuyor</h1><h2>${p.name}</h2>`;
  overlay.style.display="flex";
 
@@ -165,6 +170,10 @@ function startTurn(){
    const conn = peer.connections[pl.peer]?.[0];
    if(conn) conn.send({type:"active",activePeerId:activePeer});
  });
+
+ // Başlama zamanı ve düşme sayısı
+ p.startTime = Date.now();
+ p.falls = 0;
 
  setTimeout(()=>{
   overlay.style.display="none";
@@ -180,16 +189,16 @@ function initGame(){
  checkpoints=[{x:300}]; // ilk checkpoint
  lastCheckpointX=0;
 
- while(x<finishX){
-  let gap=220+Math.random()*120;
-  let w=260;
-  let y=canvas.height-200+(Math.random()-0.5)*120;
+ while(x < finishX){
+  let gap = 250 + Math.random()*150;
+  let w = 260 + Math.random()*100;
+  let y = canvas.height - 200 + (Math.random()-0.5)*120;
   platforms.push({x,y,w,h:30});
   count++;
-  if(count%10===0){
-   checkpoints.push({x:x+w/2});
+  if(count % 8 === 0){
+   checkpoints.push({x:x + w/2});
   }
-  x+=w+gap;
+  x += w + gap;
  }
  requestAnimationFrame(loop);
 }
@@ -226,6 +235,7 @@ function loop(){
   santa.x=lastCheckpointX||50;
   santa.y=200;
   santa.vy=0;
+  players[currentIndex].falls++;
  }
 
  ctx.save();
@@ -240,7 +250,8 @@ function loop(){
  ctx.restore();
 
  if(santa.x>finishX){
-  players[currentIndex].score=Math.floor(10000/Date.now()%1000);
+  const endTime = Date.now();
+  players[currentIndex].time = (endTime - players[currentIndex].startTime)/1000;
   currentIndex++;
   keys={left:false,right:false,up:false};
   startTurn();
