@@ -43,7 +43,6 @@ canvas{display:block}
 #lock{
  position:absolute;inset:0;display:flex;justify-content:center;align-items:center;
  background:rgba(0,0,0,.7);font-size:50px;color:#fff;z-index:5;
- display:flex;
 }
 input,button{font-size:25px;padding:10px;margin:10px}
 </style>
@@ -149,8 +148,6 @@ function startCountdown3(){
 }
 
 function startTurn(){
- document.querySelectorAll("#mobile #lock").forEach(l=>l.style.display="flex");
-
  if(currentIndex>=players.length){
   overlay.innerHTML="<h1>Alparmaklı Ailesi Oyunu - Oyun Bitti!</h1>"+players
    .sort((a,b)=>b.score-a.score)
@@ -163,13 +160,14 @@ function startTurn(){
  overlay.innerHTML=`<h1>Şimdi Oynuyor</h1><h2>${p.name}</h2>`;
  overlay.style.display="flex";
 
+ // Tüm bağlı oyunculara aktif peer ID gönder
+ players.forEach(pl=>{
+   const conn = peer.connections[pl.peer]?.[0];
+   if(conn) conn.send({type:"active",activePeerId:activePeer});
+ });
+
  setTimeout(()=>{
   overlay.style.display="none";
-  // Kilidi güncelle
-  document.querySelectorAll("#mobile #lock").forEach(l=>{
-   if(peer.id===activePeer) l.style.display="none";
-   else l.style.display="flex";
-  });
   initGame();
  },1500);
 }
@@ -178,7 +176,7 @@ function startTurn(){
 function initGame(){
  santa={x:50,y:200,w:80,h:90,vx:0,vy:0,ground:false};
  platforms=[{x:0,y:canvas.height-120,w:600,h:30}];
- let x=600; let count=1; // ilk platform checkpoint
+ let x=600; let count=1;
  checkpoints=[{x:300}]; // ilk checkpoint
  lastCheckpointX=0;
 
@@ -220,7 +218,6 @@ function loop(){
   }
  });
 
- // Checkpoint geçişi
  checkpoints.forEach(c=>{
   if(santa.x>c.x) lastCheckpointX=c.x;
  });
@@ -267,16 +264,21 @@ peer.on("open",()=>{
   conn.send({type:"join",name});
   nameScreen.style.display="none";
   mobile.style.display="block";
-  updateLock(); // kilidi ilk aç
  };
 
  joinBtn.addEventListener("click",sendJoin);
  joinBtn.addEventListener("touchstart",e=>{ e.preventDefault(); sendJoin(); },{passive:false});
 
- function updateLock(){
-  const lock=document.getElementById("lock");
-  lock.style.display=(peer.id===activePeer)?"none":"flex";
- }
+ conn.on("data",d=>{
+    if(d.type==="active"){
+       const lock=document.getElementById("lock");
+       if(peer.id===d.activePeerId) lock.style.display="none";
+       else lock.style.display="flex";
+    }
+    if(d.type==="key"){
+       keys[d.key]=d.pressed;
+    }
+ });
 
  ["left","right","up"].forEach((k,i)=>{
   const id=i==0?"left":i==1?"right":"jump";
