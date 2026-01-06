@@ -88,7 +88,6 @@ let gameActive=false,santa,platforms=[],finishX=3500;
 if(!peerId){
 
 peer.on("open",id=>{
- // GitHub Pages uyumlu QR
  let url=new URL(location.href);
  url.searchParams.set("peer",id);
  new QRCode(qrcode,{text:url.toString(),width:250,height:250});
@@ -112,24 +111,21 @@ function renderOrder(){
  order.innerHTML="<h2>Oyun Sırası</h2>"+players.map((p,i)=>`${i+1}. ${p.name}`).join("<br>");
 }
 
-// 10 saniye bekle + 3 saniye geri sayma
+// Gizli bekleme: 20 saniye, kullanıcı görmez
 function waitAndStart(){
  gameActive=true;
- countdown.style.display="flex";
- let wait=10;
- countdown.innerText=`Başlıyor: ${wait}`;
+ let hiddenWait=20;
  const waitInterval=setInterval(()=>{
-   wait--;
-   if(wait<=0){
+   hiddenWait--;
+   if(hiddenWait<=0){
      clearInterval(waitInterval);
      startCountdown3();
-   }else{
-     countdown.innerText=`Başlıyor: ${wait}`;
    }
  },1000);
 }
 
 function startCountdown3(){
+ countdown.style.display="flex";
  let count=3;
  countdown.innerText=count;
  const i=setInterval(()=>{
@@ -139,6 +135,7 @@ function startCountdown3(){
      clearInterval(i);
      countdown.style.display="none";
      overlay.style.display="none";
+     setup.style.display="none"; // QR ekranı gizlendi
      startTurn();
    }
  },1000);
@@ -210,7 +207,6 @@ function loop(){
  ctx.restore();
 
  if(santa.x>finishX){
-  // skor rastgele basit bir sayı
   players[currentIndex].score=Math.floor(10000/Date.now()%1000);
   currentIndex++;
   keys={left:false,right:false,up:false};
@@ -243,8 +239,8 @@ peer.on("open",()=>{
  ["left","right","up"].forEach((k,i)=>{
   const id=i==0?"left":i==1?"right":"jump";
   const el=document.getElementById(id);
-  el.addEventListener("touchstart",e=>{e.preventDefault();conn.send({type:"key",key:k,pressed:true});},{passive:false});
-  el.addEventListener("touchend",e=>{e.preventDefault();conn.send({type:"key",key:k,pressed:false});},{passive:false});
+  el.addEventListener("touchstart",e=>{e.preventDefault();conn.send({key:k,pressed:true,type:"key"});},{passive:false});
+  el.addEventListener("touchend",e=>{e.preventDefault();conn.send({key:k,pressed:false,type:"key"});},{passive:false});
  });
 });
 }
