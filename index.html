@@ -3,63 +3,66 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Garantili Noel Baba - Uzun Zorlu Oyun</title>
+<title>Alparmaklı Ailesi Oyunu</title>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <style>
-*{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none}
-body{margin:0;background:#000;color:#fff;font-family:Arial;overflow:hidden}
+*{margin:0;padding:0;box-sizing:border-box;
+ user-select:none;-webkit-user-select:none;
+ -webkit-touch-callout:none;touch-action:none}
+body{background:#000;color:#fff;font-family:Arial;overflow:hidden}
 canvas{display:block}
 
-#setup,#nameScreen,#overlay{
+#setup,#name,#overlay,#countdown{
  position:absolute;inset:0;display:flex;
- flex-direction:column;justify-content:center;align-items:center;
- background:#000;z-index:10;text-align:center
+ align-items:center;justify-content:center;
+ flex-direction:column;background:#000;z-index:10
 }
-#countdown{
- position:absolute;inset:0;display:none;
- justify-content:center;align-items:center;
- font-size:150px;font-weight:bold;z-index:20;color:#fff
+#countdown{font-size:140px;font-weight:bold;display:none}
+
+#title{
+ font-size:36px;
+ font-weight:bold;
+ margin-bottom:20px;
+ text-align:center;
 }
-#qrcode{background:#fff;padding:20px;border-radius:10px;margin-bottom:20px}
-#playerCount,#order{font-size:24px;margin-top:10px}
+
+#qrcode{background:#fff;padding:15px;border-radius:10px}
+#players{margin-top:10px;font-size:22px}
 
 #mobile{display:none;position:fixed;inset:0;background:#000}
-.pad{
- display:grid;
- grid-template-columns:1fr 1fr 1fr;
- height:100%;
- align-items:center
-}
+.pad{display:grid;grid-template-columns:1fr 1fr 1fr;height:100%}
 .btn{
- font-size:60px;border:4px solid #fff;
- border-radius:30px;width:85%;height:45%;
- display:flex;justify-content:center;align-items:center;
- margin:auto
+ margin:auto;width:80%;height:45%;
+ border:4px solid #fff;border-radius:30px;
+ font-size:60px;display:flex;
+ align-items:center;justify-content:center
 }
-.jump{background:rgba(255,0,0,.3);font-size:70px}
-input,button{font-size:25px;padding:10px;margin:10px}
+.jump{background:rgba(255,0,0,.35);font-size:70px}
+
+input,button{font-size:24px;padding:10px;margin:10px}
 </style>
 </head>
 
 <body>
 
 <div id="setup">
- <div id="qrcode"></div>
- <div id="playerCount">Oyuncular: 0 / 10</div>
- <div id="order"></div>
+  <!-- 🔴 BAŞLIK -->
+  <div id="title">Alparmaklı Ailesi Oyunu</div>
+
+  <div id="qrcode"></div>
+  <div id="players">Oyuncular: 0 / 10</div>
 </div>
 
 <div id="countdown"></div>
-
 <div id="overlay" style="display:none"></div>
 
-<div id="nameScreen" style="display:none">
+<div id="name" style="display:none">
  <h1>İsmini Gir</h1>
  <input id="playerName">
- <button id="joinBtn">KATIL</button>
+ <button id="join">KATIL</button>
 </div>
 
 <div id="mobile">
@@ -82,72 +85,70 @@ const peer=new Peer();
 const params=new URLSearchParams(location.search);
 const peerId=params.get("peer");
 
-let players=[],currentIndex=0,activePeer=null,keys={left:false,right:false,up:false};
-let gameActive=false,santa,platforms=[],finishX=10000,lastCheckpoint={x:50,y:200},startTime=0,falls=0;
+let players=[],current=0,activePeer=null;
+let keys={left:false,right:false};
+let jumpQueued=false,coyote=0;
+let startTime=0,falls=0;
+let santa,platforms=[],finishX=16000,lastCheckpoint;
+let time=0;
 
 /* ================= HOST ================= */
 if(!peerId){
 
 peer.on("open",id=>{
- new QRCode(qrcode,{text:location.href+"?peer="+id,width:250,height:250});
+ new QRCode(qrcode,{
+   text:location.href+"?peer="+id,
+   width:240,
+   height:240
+ });
 });
 
 peer.on("connection",c=>{
  c.on("data",d=>{
   if(d.type==="join"){
-   players.push({peer:c.peer,name:d.name,score:0,time:0,falls:0});
-   playerCount.innerText=`Oyuncular: ${players.length} / 10`;
-   renderOrder();
-   if(!gameActive && players.length>0) waitAndStart();
+   players.push({peer:c.peer,name:d.name,time:0,falls:0});
+   players.innerText=`Oyuncular: ${players.length} / 10`;
+   if(players.length===1) waitStart();
   }
-  if(d.type==="key" && c.peer===activePeer){
-   keys[d.key]=d.pressed;
+  if(c.peer===activePeer){
+   if(d.type==="key") keys[d.key]=d.pressed;
+   if(d.type==="jump") jumpQueued=true;
   }
  });
 });
 
-function renderOrder(){
- order.innerHTML="<h2>Oyun Sırası</h2>"+players.map((p,i)=>`${i+1}. ${p.name}`).join("<br>");
-}
-
-function waitAndStart(){
- gameActive=true;
- overlay.style.display="none";
- setup.style.display="flex";
- setTimeout(()=>{ startCountdown3(); },20000);
-}
-
-function startCountdown3(){
- let count=3;
- countdown.innerText=count;
- countdown.style.display="flex";
- const i=setInterval(()=>{
-   count--;
-   if(count>0) countdown.innerText=count;
+function waitStart(){
+ setTimeout(()=>{
+  let n=3;
+  countdown.style.display="flex";
+  countdown.innerText=n;
+  const i=setInterval(()=>{
+   n--;
+   if(n>0) countdown.innerText=n;
    else{
-     clearInterval(i);
-     countdown.style.display="none";
-     setup.style.display="none";
-     startTurn();
+    clearInterval(i);
+    countdown.style.display="none";
+    setup.style.display="none";
+    startTurn();
    }
- },1000);
+  },1000);
+ },20000);
 }
 
 function startTurn(){
- if(currentIndex>=players.length){
-  let sorted=players.slice().sort((a,b)=>{
-   if(a.time!==b.time) return a.time-b.time;
-   return a.falls-b.falls;
-  });
-  overlay.innerHTML="<h1>Oyun Bitti!</h1>"+sorted.map((p,i)=>`${i+1}. ${p.name} - ${p.time.toFixed(1)}s - ${p.falls} düşme`).join("<br>");
+ if(current>=players.length){
+  players.sort((a,b)=>a.time!==b.time?a.time-b.time:a.falls-b.falls);
+  overlay.innerHTML="<h1>SKOR TABLOSU</h1>"+
+   players.map((p,i)=>`${i+1}. ${p.name} - ${p.time.toFixed(1)}s (${p.falls})`).join("<br>");
   overlay.style.display="flex";
   return;
  }
- const p=players[currentIndex];
+
+ const p=players[current];
  activePeer=p.peer;
- falls=0;
- overlay.innerHTML=`<h1>Şimdi Oynuyor</h1><h2>${p.name}</h2>`;
+ overlay.innerHTML=`<h1>${p.name} BAŞLIYOR</h1>`;
  overlay.style.display="flex";
+
  setTimeout(()=>{
   overlay.style.display="none";
   initGame();
@@ -157,79 +158,108 @@ function startTurn(){
 
 /* ================= GAME ================= */
 function initGame(){
- santa={x:50,y:200,w:80,h:90,vx:0,vy:0,ground:false};
+ santa={x:50,y:200,w:70,h:80,vx:0,vy:0,ground:false};
  lastCheckpoint={x:50,y:200};
+ falls=0;
+ jumpQueued=false;
 
-platforms=[{x:0,y:canvas.height-120,w:600,h:30,checkpoint:true}];
+ platforms=[{x:0,y:canvas.height-120,w:500,h:30,cp:true,active:false}];
+ let x=500,i=1;
 
-let x=600,platIndex=1;
-while(x<finishX){
- let gap=220+Math.random()*150;
- let w=200+Math.random()*100;
- let y=canvas.height-200+(Math.random()-0.5)*150;
- let checkpoint=(platIndex%10===0);
- platforms.push({x,y,w,h:30,checkpoint});
- x+=w+gap;
- platIndex++;
+ while(x<finishX){
+  const gap=260+Math.random()*180;
+  const w=220+Math.random()*120;
+  const y=canvas.height-220+(Math.random()-0.5)*200;
+  platforms.push({x,y,w,h:30,cp:i%10===0,active:false});
+  x+=w+gap; i++;
+ }
+
+ requestAnimationFrame(loop);
 }
 
-requestAnimationFrame(loop);
+function vibrate(ms){
+ if(navigator.vibrate) navigator.vibrate(ms);
 }
 
 function loop(){
+ time+=0.05;
  ctx.fillStyle="#000"; ctx.fillRect(0,0,canvas.width,canvas.height);
 
- if(keys.left)santa.vx=-8;
- else if(keys.right)santa.vx=8;
+ if(keys.left) santa.vx=-7;
+ else if(keys.right) santa.vx=7;
  else santa.vx*=0.8;
 
- if(keys.up && santa.ground){santa.vy=-15; santa.ground=false;}
+ santa.vy+=0.7;
+ santa.x+=santa.vx;
+ santa.y+=santa.vy;
 
- santa.vy+=0.6;
- santa.x+=santa.vx; santa.y+=santa.vy; santa.ground=false;
-
+ santa.ground=false;
  platforms.forEach(p=>{
   if(santa.vy>=0 &&
-     santa.x<p.x+p.w &&
      santa.x+santa.w>p.x &&
+     santa.x<p.x+p.w &&
      santa.y+santa.h>p.y &&
      santa.y+santa.h<p.y+p.h+20){
    santa.ground=true;
    santa.vy=0;
    santa.y=p.y-santa.h;
-   if(p.checkpoint) lastCheckpoint={x:santa.x,y:santa.y};
+   coyote=8;
+   if(p.cp && !p.active){
+    p.active=true;
+    lastCheckpoint={x:santa.x,y:santa.y};
+    vibrate(120);
+   }
   }
  });
 
+ if(!santa.ground && coyote>0) coyote--;
+
+ if(jumpQueued && (santa.ground || coyote>0)){
+  santa.vy=-14;
+  jumpQueued=false;
+  coyote=0;
+ }
+
  if(santa.y>canvas.height){
-   santa.x=lastCheckpoint.x;
-   santa.y=lastCheckpoint.y;
-   santa.vx=0;
-   santa.vy=0;
-   falls++;
+  santa.x=lastCheckpoint.x;
+  santa.y=lastCheckpoint.y;
+  santa.vx=0; santa.vy=0;
+  jumpQueued=false;
+  falls++;
+  vibrate(200);
  }
 
  ctx.save();
  ctx.translate(-santa.x+150,0);
 
  platforms.forEach(p=>{
-  ctx.fillStyle=p.checkpoint?"#0f0":"#0ff";
+  ctx.fillStyle=p.cp?"#0f0":"#0ff";
   ctx.fillRect(p.x,p.y,p.w,p.h);
+
+  if(p.cp){
+   const wave=Math.sin(time+p.x*0.02)*10;
+   ctx.fillStyle="#ff0";
+   ctx.fillRect(p.x+10,p.y-50+wave,6,50);
+   ctx.beginPath();
+   ctx.moveTo(p.x+16,p.y-50+wave);
+   ctx.lineTo(p.x+50,p.y-35+wave);
+   ctx.lineTo(p.x+16,p.y-20+wave);
+   ctx.fill();
+  }
  });
 
  ctx.fillStyle="#f00";
  ctx.fillRect(finishX,0,20,canvas.height);
-
- ctx.font="120px Arial";
- ctx.fillText("🎅",santa.x,santa.y+100);
+ ctx.font="110px Arial";
+ ctx.fillText("🎅",santa.x,santa.y+90);
  ctx.restore();
 
- if(santa.x+80>finishX){
-  const timeElapsed=(Date.now()-startTime)/1000;
-  players[currentIndex].time=timeElapsed;
-  players[currentIndex].falls=falls;
-  currentIndex++;
-  keys={left:false,right:false,up:false};
+ if(santa.x+santa.w>finishX){
+  players[current].time=(Date.now()-startTime)/1000;
+  players[current].falls=falls;
+  current++;
+  keys={left:false,right:false};
+  jumpQueued=false;
   startTurn();
   return;
  }
@@ -239,52 +269,51 @@ function loop(){
 
 /* ================= MOBILE ================= */
 }else{
-setup.style.display="none";
-nameScreen.style.display="flex";
+ setup.style.display="none";
+ name.style.display="flex";
 
-peer.on("open",()=>{
- const conn=peer.connect(peerId);
+ peer.on("open",()=>{
+  const conn=peer.connect(peerId);
 
- const sendJoin=()=>{
-  const name=playerName.value.trim();
-  if(!name) return alert("Lütfen isim girin");
-  conn.send({type:"join",name});
-  nameScreen.style.display="none";
-  mobile.style.display="block";
- };
-
- joinBtn.addEventListener("click",sendJoin);
- joinBtn.addEventListener("touchstart",e=>{ e.preventDefault(); sendJoin(); },{passive:false});
-
- // Stabil tuşlar
- ["left","right","up"].forEach((k,i)=>{
-  const id = i===0 ? "left" : i===1 ? "right" : "jump";
-  const el = document.getElementById(id);
-
-  let isPressed = false;
-
-  const startTouch = e => {
-    e.preventDefault();
-    if(!isPressed){
-      isPressed = true;
-      conn.send({type:"key", key:k, pressed:true});
-    }
+  join.onclick=()=>{
+   if(!playerName.value.trim()) return alert("İsim gir");
+   conn.send({type:"join",name:playerName.value.trim()});
+   name.style.display="none";
+   mobile.style.display="block";
   };
 
-  const endTouch = e => {
+  const bind=(id,key)=>{
+   const el=document.getElementById(id);
+   let pressed=false;
+
+   el.addEventListener("touchstart",e=>{
     e.preventDefault();
-    if(isPressed){
-      isPressed = false;
-      conn.send({type:"key", key:k, pressed:false});
+    if(key==="jump"){
+     conn.send({type:"jump"});
+     vibrate(40);
+     return;
     }
+    if(!pressed){
+     pressed=true;
+     conn.send({type:"key",key,pressed:true});
+    }
+   },{passive:false});
+
+   el.addEventListener("touchend",e=>{
+    e.preventDefault();
+    if(pressed){
+     pressed=false;
+     conn.send({type:"key",key,pressed:false});
+    }
+   },{passive:false});
+
+   el.addEventListener("touchcancel",()=>pressed=false);
   };
 
-  el.addEventListener("touchstart", startTouch, {passive:false});
-  el.addEventListener("touchend", endTouch, {passive:false});
-  el.addEventListener("touchcancel", endTouch, {passive:false});
-  el.addEventListener("touchleave", endTouch, {passive:false});
+  bind("left","left");
+  bind("right","right");
+  bind("jump","jump");
  });
-});
 }
 </script>
 
