@@ -5,142 +5,46 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Alparmaklı Ailesi Oyunu</title>
 
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
 <style>
-body{margin:0;background:#000;color:#fff;font-family:Arial;overflow:hidden}
-.screen{
- position:fixed;inset:0;
- display:flex;flex-direction:column;
- align-items:center;justify-content:center
-}
-#qrcode{background:#fff;padding:15px;border-radius:10px}
-#title{font-size:36px;margin-bottom:20px}
-#countdown{font-size:160px;font-weight:bold;display:none}
-
-#name input,#name button{
- font-size:24px;padding:10px;margin:10px
-}
-
-#mobile{display:none;position:fixed;inset:0}
-.pad{display:grid;grid-template-columns:1fr 1fr 1fr;height:100%}
-.btn{
- margin:auto;width:80%;height:45%;
- border:4px solid #fff;border-radius:30px;
- font-size:60px;display:flex;
- align-items:center;justify-content:center
-}
-.jump{background:rgba(255,0,0,.35)}
-#lock{
- position:absolute;inset:0;
- display:flex;align-items:center;
+body{
+ margin:0;
+ background:#000;
+ color:#fff;
+ font-family:Arial;
+ display:flex;
+ flex-direction:column;
+ align-items:center;
  justify-content:center;
- background:rgba(0,0,0,.85);
- font-size:40px
+ height:100vh
 }
+#title{font-size:36px;margin-bottom:20px}
+#qrcode{background:#fff;padding:15px;border-radius:10px}
 </style>
 </head>
 
 <body>
 
-<!-- HOST -->
-<div id="host" class="screen">
- <div id="title">Alparmaklı Ailesi Oyunu</div>
- <div id="qrcode"></div>
-</div>
-
-<div id="countdown" class="screen"></div>
-
-<!-- MOBILE NAME -->
-<div id="name" class="screen" style="display:none">
- <h1>İsmini Gir</h1>
- <input id="playerName">
- <button id="join">KATIL</button>
-</div>
-
-<!-- MOBILE CONTROLLER -->
-<div id="mobile">
- <div id="lock">Sıranı Bekle</div>
- <div class="pad">
-  <div class="btn">◀</div>
-  <div class="btn jump">ZIPLA</div>
-  <div class="btn">▶</div>
- </div>
-</div>
+<div id="title">Alparmaklı Ailesi Oyunu</div>
+<div id="qrcode"></div>
 
 <script>
-const params=new URLSearchParams(location.search);
-const peerParam=params.get("peer");
-const peer=new Peer();
-let connections=[];
-let gameStarted=false;
+const peer = new Peer();
 
-/* ================= HOST ================= */
-if(!peerParam){
- peer.on("open",id=>{
-  new QRCode(qrcode,{
-   text:location.href+"?peer="+id,
-   width:240,height:240
-  });
+peer.on("open", id => {
+ const qrEl = document.getElementById("qrcode");
+ qrEl.innerHTML = ""; // garanti temizle
 
-  // 🔥 20 SANİYE QR EKRANI (GİZLİ)
-  setTimeout(startCountdown,20000);
+ new QRCode(qrEl, {
+  text: location.href + "?peer=" + id,
+  width: 240,
+  height: 240
  });
 
- peer.on("connection",c=>{
-  connections.push(c);
- });
-
- function startCountdown(){
-  host.style.display="none";
-  countdown.style.display="flex";
-
-  let n=3;
-  countdown.innerText=n;
-
-  const int=setInterval(()=>{
-   n--;
-   if(n===0){
-    clearInterval(int);
-    countdown.style.display="none";
-    startGame();
-   }else{
-    countdown.innerText=n;
-   }
-  },1000);
- }
-
- function startGame(){
-  gameStarted=true;
-  connections.forEach(c=>{
-   c.send({type:"start"});
-  });
- }
-}
-
-/* ================= MOBILE ================= */
-else{
- host.style.display="none";
- name.style.display="flex";
-
- peer.on("open",()=>{
-  const conn=peer.connect(peerParam);
-
-  join.onclick=()=>{
-   if(!playerName.value.trim()) return alert("İsim gir");
-   conn.send({type:"join",name:playerName.value});
-   name.style.display="none";
-   mobile.style.display="block";
-  };
-
-  conn.on("data",d=>{
-   if(d.type==="start"){
-    lock.style.display="none"; // 🔓 KUMANDA AÇILDI
-   }
-  });
- }
-}
+ console.log("QR OLUŞTU, PEER ID:", id);
+});
 </script>
 
 </body>
