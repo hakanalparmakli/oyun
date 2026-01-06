@@ -2,29 +2,25 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Alparmaklı Ailesi Oyunu</title>
-
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-
 <style>
-body{margin:0;background:#000;color:#fff;font-family:Arial;overflow:hidden;height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;}
-.screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-#qrcode{background:#fff;padding:15px;border-radius:10px}
-#order{margin-top:20px;font-size:22px;text-align:center}
-#countdown{font-size:160px;font-weight:bold;display:none}
-
-#name input,#name button{font-size:24px;padding:10px;margin:10px}
-
-#mobile{display:none;position:absolute;inset:0}
-.pad{display:grid;grid-template-columns:1fr 1fr 1fr;height:100%}
-.btn{margin:auto;width:80%;height:45%;border:4px solid #fff;border-radius:30px;font-size:60px;display:flex;align-items:center;justify-content:center}
-.jump{background:rgba(255,0,0,.35)}
-#lock{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.85);font-size:40px;z-index:5}
+body{margin:0;background:#000;color:#fff;font-family:sans-serif;overflow:hidden;}
+canvas{display:block;}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+#qrcode{background:#fff;padding:15px;border-radius:10px;}
+#order{margin-top:20px;font-size:22px;text-align:center;}
+#countdown{font-size:160px;font-weight:bold;display:none;}
+#name input,#name button{font-size:24px;padding:10px;margin:10px;}
+#mobile{display:none;position:absolute;inset:0;}
+.pad{display:grid;grid-template-columns:1fr 1fr 1fr;height:100%;}
+.btn{margin:auto;width:80%;height:45%;border:4px solid #fff;border-radius:30px;font-size:60px;display:flex;align-items:center;justify-content:center;}
+.jump{background:rgba(255,0,0,.35);}
+#lock{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.85);font-size:40px;z-index:5;}
 </style>
 </head>
-
 <body>
 
 <!-- HOST -->
@@ -52,26 +48,26 @@ body{margin:0;background:#000;color:#fff;font-family:Arial;overflow:hidden;heigh
  </div>
 </div>
 
+<canvas id="gameCanvas"></canvas>
+
 <script>
+const canvas=document.getElementById("gameCanvas");
+const ctx=canvas.getContext("2d");
 const params=new URLSearchParams(location.search);
 const peerParam=params.get("peer");
 const peer=new Peer();
-let connections=[],players=[],activeIndex=0,activePeerId=null,gameStarted=false;
+let connections=[],players=[],activePeerId=null,gameStarted=false,keys={left:false,right:false,up:false};
 
-/* ================= HOST ================= */
+/* ------------------ HOST ------------------ */
 if(!peerParam){
  const hostEl=document.getElementById("host");
  const orderEl=document.getElementById("order");
  const countdownEl=document.getElementById("countdown");
 
  peer.on("open",id=>{
-  const qrEl=document.getElementById("qrcode");
-  qrEl.innerHTML="";
-  new QRCode(qrEl,{text:location.href+"?peer="+id,width:240,height:240});
-  console.log("QR oluşturuldu, Peer ID:",id);
-
-  // 20 saniye bekleme (ekranda görünmez)
-  setTimeout(startCountdown,20000);
+  new QRCode(document.getElementById("qrcode"),{text:location.href+"?peer="+id,width:240,height:240});
+  console.log("QR oluşturuldu:",id);
+  setTimeout(startCountdown,20000); // 20 saniye bekleme
  });
 
  peer.on("connection",c=>{
@@ -84,43 +80,32 @@ if(!peerParam){
   });
  });
 
- function shuffle(arr){
-  for(let i=arr.length-1;i>0;i--){
-   const j=Math.floor(Math.random()*(i+1));
-   [arr[i],arr[j]]=[arr[j],arr[i]];
-  }
- }
+ function shuffle(arr){for(let i=arr.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}}
 
  function renderOrder(){
   shuffle(players);
-  orderEl.innerHTML="<b>Oyun Sırası</b><br><br>"+
-   players.map((p,i)=>`${i+1}. ${p.name}${i===0?" (BAŞLIYOR)":""}`).join("<br>");
+  orderEl.innerHTML="<b>Oyun Sırası</b><br><br>"+players.map((p,i)=>`${i+1}. ${p.name}${i===0?" (BAŞLIYOR)":""}`).join("<br>");
   activePeerId=players[0]?.id||null;
  }
 
  function startCountdown(){
   hostEl.style.display="none";
   countdownEl.style.display="flex";
-  let n=3;
-  countdownEl.innerText=n;
+  let n=3; countdownEl.innerText=n;
   const interval=setInterval(()=>{
-   n--;
-   if(n>0) countdownEl.innerText=n;
-   else{
-    clearInterval(interval);
-    countdownEl.style.display="none";
-    startGame();
-   }
+   n--; if(n>0) countdownEl.innerText=n;
+   else{ clearInterval(interval); countdownEl.style.display="none"; startGame(); }
   },1000);
  }
 
  function startGame(){
   gameStarted=true;
   connections.forEach(c=>c.send({type:"start",activePeerId}));
+  initGame();
  }
 }
 
-/* ================= MOBILE ================= */
+/* ------------------ MOBILE ------------------ */
 else{
  const nameEl=document.getElementById("name");
  const mobileEl=document.getElementById("mobile");
@@ -130,8 +115,6 @@ else{
 
  peer.on("open",()=>{
   const conn=peer.connect(peerParam);
-
-  // İsim girme ekranı
   nameEl.style.display="flex";
 
   joinBtn.onclick=()=>{
@@ -144,36 +127,77 @@ else{
 
   conn.on("data",d=>{
    if(d.type==="start"){
-    if(peer.id===d.activePeerId) lockEl.style.display="none"; // aktif oyuncu
-    else lockEl.style.display="flex"; // diğerleri kilitli
-   }
+    if(peer.id===d.activePeerId) lockEl.style.display="none";
+    else lockEl.style.display="flex";
+   } 
+   if(d.type==="key") keys[d.key]=d.pressed;
   });
-
-  const send=(key,pressed)=>{
-   if(peer.id===activePeerId){
-    if(conn.open) conn.send({type:"key",key,pressed});
-   }
-  };
 
   const bind=(id,key)=>{
    const el=document.getElementById(id);
    let pressed=false;
-   el.addEventListener("touchstart",e=>{
-    e.preventDefault();
-    if(!pressed){pressed=true;send(key,true);}
-   },{passive:false});
-   el.addEventListener("touchend",e=>{
-    e.preventDefault();
-    pressed=false;send(key,false);
-   },{passive:false});
+   el.addEventListener("touchstart",e=>{e.preventDefault();if(!pressed){pressed=true;conn.send({type:"key",key,keyPressed:true})}},{passive:false});
+   el.addEventListener("touchend",e=>{e.preventDefault();pressed=false;conn.send({type:"key",key,keyPressed:false})},{passive:false});
   };
 
-  bind("left","left");
-  bind("right","right");
-  bind("jump","jump");
+  bind("left","left"); bind("right","right"); bind("jump","up");
+}
+
+/* ------------------ OYUN ------------------ */
+function initGame(){
+ canvas.width=window.innerWidth; canvas.height=window.innerHeight;
+ window.santa={x:100,y:canvas.height-400,w:80,h:90,vx:0,vy:0,jumpForce:-20,grounded:false};
+ window.platforms=[{x:50,y:canvas.height-150,w:1000,h:30}];
+ window.gifts=[]; window.score=0;
+ for(let i=0;i<20;i++) spawnPlatform();
+ requestAnimationFrame(update);
+}
+
+function spawnPlatform(){
+ const last=platforms[platforms.length-1];
+ const xGap=50+Math.random()*50;
+ const yGap=(Math.random()-0.5)*80;
+ const x=last.x+last.w+xGap;
+ const y=Math.max(250,Math.min(canvas.height-180,last.y+yGap));
+ const w=200+Math.random()*200;
+ platforms.push({x,y,w,h:30});
+ if(Math.random()>0.4) gifts.push({x:x+w/2,y:y-80,active:true});
+}
+
+function update(){
+ if(!gameStarted) return;
+ let speed=12;
+ if(keys.left) santa.vx=-speed;
+ else if(keys.right) santa.vx=speed;
+ else santa.vx*=0.85;
+ if(keys.up && santa.grounded){santa.vy=santa.jumpForce;santa.grounded=false;}
+ santa.vy+=0.6; santa.x+=santa.vx;santa.y+=santa.vy;
+ santa.grounded=false;
+
+ platforms.forEach(p=>{
+  if(santa.vy>=0 && santa.x+10<p.x+p.w && santa.x+santa.w-10>p.x && santa.y+santa.h>p.y && santa.y+santa.h<p.y+p.h+santa.vy+10){
+   santa.grounded=true;santa.vy=0;santa.y=p.y-santa.h;
+  }
  });
+
+ gifts.forEach(g=>{
+  if(g.active && Math.abs(santa.x-g.x)<80 && Math.abs(santa.y-g.y)<120){g.active=false;score++;}
+ });
+
+ if(santa.y>canvas.height+200){const restart=platforms.find(p=>p.x>santa.x-300)||platforms[0];santa.x=restart.x+20;santa.y=restart.y-300;santa.vy=0;}
+
+ draw(); requestAnimationFrame(update);
+}
+
+function draw(){
+ ctx.fillStyle="#000"; ctx.fillRect(0,0,canvas.width,canvas.height);
+ const camX=-santa.x+150; ctx.save(); ctx.translate(camX,0);
+ platforms.forEach(p=>{ctx.fillStyle="#0ff";ctx.fillRect(p.x,p.y,p.w,p.h);ctx.fillStyle="#fff";ctx.fillRect(p.x,p.y,p.w,10);});
+ gifts.forEach(g=>{if(g.active){ctx.font="70px Arial";ctx.fillText("🎁",g.x,g.y);}});
+ ctx.font="120px Arial";ctx.fillText("🎅",santa.x,santa.y+100);
+ ctx.restore();
+ ctx.fillStyle="#fff";ctx.font="bold 40px Arial";ctx.fillText("SKOR: "+score,40,80);
 }
 </script>
-
 </body>
 </html>
