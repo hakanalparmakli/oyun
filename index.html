@@ -63,8 +63,8 @@ if(!peerParam){
 
  peer.on("open",id=>{
    const qrEl=document.getElementById("qrcode");
-   qrEl.innerHTML="";
-   new QRCode(qrEl,{text:location.href+"?peer="+id,width:240,height:240});
+   qrEl.innerHTML=""; // Temizle
+   new QRCode(qrEl,{text:location.href+"?peer="+id,width:240,height:240}); // QR oluştur
    console.log("QR oluşturuldu:",id);
    setTimeout(startCountdown,20000);
  });
